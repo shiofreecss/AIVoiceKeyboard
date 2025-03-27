@@ -1,0 +1,10 @@
+{
+  "version": 2,
+  "dgSpecHash": "UP1tyiWOs4M=",
+  "success": true,
+  "projectFilePath": "C:\\Users\\Admin\\Documents\\GitHub\\ai-voice-keyboard\\VoiceToKeyboard\\VoiceToKeyboard.csproj",
+  "expectedPackageFiles": [
+    "C:\\Users\\Admin\\.nuget\\packages\\system.speech\\9.0.3\\system.speech.9.0.3.nupkg.sha512"
+  ],
+  "logs": []
+}
