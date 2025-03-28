@@ -5,7 +5,6 @@ bin/
 node_modules/
 jspm_packages/
 models/
-obj/
 
 # Cache directories
 .npm/
@@ -28,3 +27,9 @@ yarn-error.log*
 # Operating system files
 .DS_Store
 Thumbs.db 
+*.dll
+/VoiceToKeyboard/bin
+/VoiceToKeyboard/obj
+/VoiceToKeyboard/bin/Debug
+/VoiceToKeyboard/bin/Debug/net8.0-windows
+
