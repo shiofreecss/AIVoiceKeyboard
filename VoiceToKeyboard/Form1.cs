@@ -518,7 +518,7 @@ public partial class Form1 : Form
     private void InitializeUI()
     {
         // Change form title and appearance
-        this.Text = "AI - VoiceToKeyboard - v1.0.2";
+        this.Text = "AI Voice Keyboard - v1.0.0";
         this.BackColor = System.Drawing.Color.FromArgb(245, 247, 250);
         this.FormBorderStyle = FormBorderStyle.FixedSingle;
         this.MaximizeBox = false;
@@ -535,7 +535,7 @@ public partial class Form1 : Form
         // Add title label to header
         Label titleLabel = new Label
         {
-            Text = "AI Voice to Keyboard",
+            Text = "AI Voice Keyboard",
             ForeColor = System.Drawing.Color.White,
             Font = new System.Drawing.Font("Segoe UI", 18F, System.Drawing.FontStyle.Bold),
             AutoSize = true,
