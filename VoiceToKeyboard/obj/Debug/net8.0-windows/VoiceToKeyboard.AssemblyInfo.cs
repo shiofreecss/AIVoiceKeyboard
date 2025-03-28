@@ -13,7 +13,7 @@ using System.Reflection;
 [assembly: System.Reflection.AssemblyCompanyAttribute("VoiceToKeyboard")]
 [assembly: System.Reflection.AssemblyConfigurationAttribute("Debug")]
 [assembly: System.Reflection.AssemblyFileVersionAttribute("1.0.0.0")]
-[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+4769f4529f850eaba7a773d99e71c10f2a024d53")]
+[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+b03bfc66b888a317a06cbdebfff086dac54195ab")]
 [assembly: System.Reflection.AssemblyProductAttribute("VoiceToKeyboard")]
 [assembly: System.Reflection.AssemblyTitleAttribute("VoiceToKeyboard")]
 [assembly: System.Reflection.AssemblyVersionAttribute("1.0.0.0")]

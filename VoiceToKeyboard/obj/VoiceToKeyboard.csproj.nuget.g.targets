@@ -1,2 +1,12 @@
 ﻿<?xml version="1.0" encoding="utf-8" standalone="no"?>
-<Project ToolsVersion="14.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003" />
+<Project ToolsVersion="14.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ImportGroup Condition=" '$(ExcludeRestorePackageImports)' != 'true' ">
+    <Import Project="$(NuGetPackageRoot)whisper.net.runtime.vulkan\1.7.4\build\Whisper.net.Runtime.Vulkan.targets" Condition="Exists('$(NuGetPackageRoot)whisper.net.runtime.vulkan\1.7.4\build\Whisper.net.Runtime.Vulkan.targets')" />
+    <Import Project="$(NuGetPackageRoot)whisper.net.runtime.openvino\1.7.4\build\Whisper.net.Runtime.OpenVino.targets" Condition="Exists('$(NuGetPackageRoot)whisper.net.runtime.openvino\1.7.4\build\Whisper.net.Runtime.OpenVino.targets')" />
+    <Import Project="$(NuGetPackageRoot)whisper.net.runtime.noavx\1.7.4\build\Whisper.net.Runtime.NoAvx.targets" Condition="Exists('$(NuGetPackageRoot)whisper.net.runtime.noavx\1.7.4\build\Whisper.net.Runtime.NoAvx.targets')" />
+    <Import Project="$(NuGetPackageRoot)whisper.net.runtime.cuda.windows\1.7.4\build\Whisper.net.Runtime.Cuda.Windows.targets" Condition="Exists('$(NuGetPackageRoot)whisper.net.runtime.cuda.windows\1.7.4\build\Whisper.net.Runtime.Cuda.Windows.targets')" />
+    <Import Project="$(NuGetPackageRoot)whisper.net.runtime.cuda.linux\1.7.4\build\Whisper.net.Runtime.Cuda.Linux.targets" Condition="Exists('$(NuGetPackageRoot)whisper.net.runtime.cuda.linux\1.7.4\build\Whisper.net.Runtime.Cuda.Linux.targets')" />
+    <Import Project="$(NuGetPackageRoot)whisper.net.runtime.coreml\1.7.4\build\Whisper.net.Runtime.CoreML.targets" Condition="Exists('$(NuGetPackageRoot)whisper.net.runtime.coreml\1.7.4\build\Whisper.net.Runtime.CoreML.targets')" />
+    <Import Project="$(NuGetPackageRoot)whisper.net.runtime\1.7.4\build\Whisper.net.Runtime.targets" Condition="Exists('$(NuGetPackageRoot)whisper.net.runtime\1.7.4\build\Whisper.net.Runtime.targets')" />
+  </ImportGroup>
+</Project>

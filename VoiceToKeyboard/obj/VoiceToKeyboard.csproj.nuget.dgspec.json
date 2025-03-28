@@ -43,9 +43,17 @@
         "net8.0-windows7.0": {
           "targetAlias": "net8.0-windows",
           "dependencies": {
+            "NAudio": {
+              "target": "Package",
+              "version": "[2.2.1, )"
+            },
             "System.Speech": {
               "target": "Package",
-              "version": "[9.0.3, )"
+              "version": "[8.0.0, )"
+            },
+            "Whisper.net.AllRuntimes": {
+              "target": "Package",
+              "version": "[1.7.4, )"
             }
           },
           "imports": [
