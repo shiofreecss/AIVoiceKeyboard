@@ -1,6 +1,6 @@
 # AI Voice to Keyboard - Version History
 
-## Version 1.0.2 (Current) - March 28, 2025
+## Version 1.0.0 (Current) - March 28, 2025
 
 ### New Features
 - **Real-time Word Recognition**: Added real-time word-by-word processing for more responsive dictation
@@ -25,6 +25,6 @@
 - Added visual indicator showing when recording is active
 - Adjusted layout for better usability
 
-## Version 1.0.1 - March 20, 2025
+## Version 0.1 - March 20, 2025
 
 Initial release with basic functionality.
