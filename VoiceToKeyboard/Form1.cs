@@ -26,6 +26,11 @@ public partial class Form1 : Form
     private Label? recognizedLabel; // Reference to the recognized text label
     private System.Windows.Forms.Timer? flashTimer; // Timer for flashing the speaking indicator
     
+    // Version information
+    public string appVersion = "1.0.2"; // Default version if config file not found
+    public string buildNumber = "1002";
+    public string releaseDate = "2025-03-30";
+    
     // Whisper components
     private WhisperSpeechRecognition? whisperRecognition;
     private AudioCapture? audioCapture;
@@ -174,6 +179,7 @@ public partial class Form1 : Form
     public Form1()
     {
         InitializeComponent();
+        LoadVersionInfo();
         InitializeSpeechRecognition();
         // Don't initialize Whisper here, do it after the form is loaded
         InitializeUI();
@@ -183,6 +189,52 @@ public partial class Form1 : Form
         
         // Add form load event handler to initialize Whisper after the window handle is created
         this.Load += Form1_Load;
+    }
+
+    private void LoadVersionInfo()
+    {
+        try
+        {
+            // Try to load version info from config file
+            string configPath = Path.Combine(Application.StartupPath, "version.cfg");
+            
+            // If not found in the app directory, try the project directory
+            if (!File.Exists(configPath))
+            {
+                configPath = Path.Combine("version.cfg");
+            }
+            
+            if (File.Exists(configPath))
+            {
+                string[] lines = File.ReadAllLines(configPath);
+                foreach (string line in lines)
+                {
+                    // Skip empty lines and comments
+                    if (string.IsNullOrWhiteSpace(line) || line.StartsWith("#"))
+                        continue;
+                        
+                    // Parse key-value pairs
+                    string[] parts = line.Split('=');
+                    if (parts.Length == 2)
+                    {
+                        string key = parts[0].Trim();
+                        string value = parts[1].Trim();
+                        
+                        if (key.Equals("version", StringComparison.OrdinalIgnoreCase))
+                            appVersion = value;
+                        else if (key.Equals("build", StringComparison.OrdinalIgnoreCase))
+                            buildNumber = value;
+                        else if (key.Equals("release_date", StringComparison.OrdinalIgnoreCase))
+                            releaseDate = value;
+                    }
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            // If any error occurs, default values will be used
+            Console.WriteLine($"Error loading version info: {ex.Message}");
+        }
     }
 
     private void Form1_Load(object sender, EventArgs e)
@@ -645,7 +697,7 @@ public partial class Form1 : Form
     private void InitializeUI()
     {
         // Change form title and appearance
-        this.Text = "AI Voice Keyboard - v1.0.1";
+        this.Text = $"AI Voice Keyboard - v{appVersion}";
         this.BackColor = System.Drawing.Color.FromArgb(245, 247, 250);
         this.FormBorderStyle = FormBorderStyle.FixedSingle;
         this.MaximizeBox = false;
@@ -1695,8 +1747,24 @@ public partial class Form1 : Form
     // Custom AboutBox form for displaying app information
     private class AboutBox : Form
     {
+        private string appVersion;
+        private string buildNumber;
+        
         public AboutBox()
         {
+            // Get version info from the parent form
+            if (Owner is Form1 parentForm)
+            {
+                appVersion = parentForm.appVersion;
+                buildNumber = parentForm.buildNumber;
+            }
+            else
+            {
+                // Default values if parent form not accessible
+                appVersion = "1.0.1";
+                buildNumber = "1001";
+            }
+            
             InitializeAboutBox();
         }
         
@@ -1774,7 +1842,7 @@ public partial class Form1 : Form
             // Version info
             Label versionLabel = new Label
             {
-                Text = "Version: v1.0.1",
+                Text = $"Version: v{appVersion} (Build {buildNumber})",
                 Font = new Font("Segoe UI", 10),
                 Location = new Point(110, 65),
                 AutoSize = true

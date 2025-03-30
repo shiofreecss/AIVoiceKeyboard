@@ -1,4 +1,4 @@
-# AI Voice to Keyboard Converter (v1.0.1)
+# AI Voice to Keyboard Converter (v1.0.2)
 
 A Windows application that converts voice commands to keyboard inputs, allowing hands-free control of your computer. The application offers both Windows Speech Recognition and OpenAI Whisper for more accurate speech-to-text capabilities.
 
@@ -136,7 +136,15 @@ The application uses OpenAI's Whisper for high-quality speech recognition in Str
 8. Use the scrollbar to view longer text and the "Copy Text" button to copy to clipboard
 9. Click "Stop Listening" when you're done with voice recognition
 
-## New Features in v1.0.1 (Current)
+## New Features in v1.0.2 (Current)
+
+### Version Configuration System
+- Added a version.cfg file to manage application version information
+- Application now reads version, build number, and release date from external configuration
+- Improved About dialog shows detailed version and build information
+- Simplified version management for future updates
+
+## Features from v1.0.1
 
 ### Enhanced Noise Filtering
 - Comprehensive filtering of noise annotations in various formats:

@@ -1,6 +1,21 @@
 # AI Voice to Keyboard Converter - Version History
 
-## v1.0.1 (Current)
+## v1.0.2 (Current)
+
+### Improvements
+- Added version.cfg file to manage application version information
+- Application now reads version, build number, and release date from external configuration
+- Improved About dialog shows detailed version and build information
+- Enhanced icon handling with proper fallback mechanisms
+- Added custom application icon in both ICO and PNG formats
+- Simplified version management for future updates
+
+### Technical Improvements
+- Icon files are now properly included in the build process
+- Version configuration is automatically copied to the output directory
+- Added robust error handling for version reading and icon loading
+
+## v1.0.1
 
 ### Improvements
 - Added automatic pause after 1.5 seconds of silence in String Mode
