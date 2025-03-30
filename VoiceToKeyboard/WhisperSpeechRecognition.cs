@@ -110,7 +110,7 @@ namespace VoiceToKeyboard
                     }
                 }
                 
-                RaiseStatusChanged($"Loading Whisper model from: {_modelFileName}");
+                RaiseStatusChanged($"Loading Whisper model...");
                 
                 try
                 {

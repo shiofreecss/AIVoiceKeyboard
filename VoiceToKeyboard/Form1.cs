@@ -8,6 +8,9 @@ using System.Threading.Tasks;
 using System.Threading;
 using System.IO;
 using System.Text.RegularExpressions;
+using System.Drawing;
+using System.Drawing.Drawing2D;
+using System.Drawing.Imaging;
 
 namespace VoiceToKeyboard;
 
@@ -37,7 +40,7 @@ public partial class Form1 : Form
     private CancellationTokenSource? cancellationTokenSource;
     private bool useWhisperForString = true;
     private bool isWhisperReady = false;
-    private CheckBox? useWhisperCheckbox;
+    private Label? useWhisperLabel;
     private bool isProcessingAudio = false; // Flag to prevent duplicate processing
     private string currentWhisperModel = "ggml-medium.bin"; // Default medium model
     private Button? resetModelButton; // Renamed from downloadModelButton
@@ -284,14 +287,14 @@ public partial class Form1 : Form
             whisperRecognition.InitializeAsync().Wait();
             isWhisperReady = true;
             
-            // Enable the checkbox when ready
+            // Update the label when ready
             if (this.IsHandleCreated)
             {
                 this.Invoke((MethodInvoker)delegate
                 {
-                    if (useWhisperCheckbox != null)
+                    if (useWhisperLabel != null)
                     {
-                        useWhisperCheckbox.Enabled = isWhisperReady;
+                        useWhisperLabel.Enabled = isWhisperReady;
                     }
                 });
             }
@@ -677,16 +680,16 @@ public partial class Form1 : Form
                     status.Contains("failed", StringComparison.OrdinalIgnoreCase) ||
                     status.Contains("not found", StringComparison.OrdinalIgnoreCase))
                 {
-                    statusLabel.ForeColor = System.Drawing.Color.Red;
+                    statusLabel.ForeColor = System.Drawing.Color.FromArgb(255, 100, 100); // Brighter red for errors
                 }
                 else if (status.Contains("warning", StringComparison.OrdinalIgnoreCase) ||
                          status.Contains("download", StringComparison.OrdinalIgnoreCase))
                 {
-                    statusLabel.ForeColor = System.Drawing.Color.DarkOrange;
+                    statusLabel.ForeColor = System.Drawing.Color.FromArgb(255, 180, 80); // Brighter orange for warnings
                 }
                 else
                 {
-                    statusLabel.ForeColor = System.Drawing.Color.FromArgb(80, 80, 80);
+                    statusLabel.ForeColor = System.Drawing.Color.FromArgb(123, 162, 217); // Lighter blue for normal status
                 }
                 
                 statusLabel.Refresh();
@@ -698,7 +701,7 @@ public partial class Form1 : Form
     {
         // Change form title and appearance
         this.Text = $"AI Voice Keyboard - v{appVersion}";
-        this.BackColor = System.Drawing.Color.FromArgb(245, 247, 250);
+        this.BackColor = System.Drawing.Color.FromArgb(20, 21, 30); // Dark background like Bitwarden
         this.FormBorderStyle = FormBorderStyle.FixedSingle;
         this.MaximizeBox = false;
         
@@ -734,7 +737,7 @@ public partial class Form1 : Form
         // Create panel for header
         Panel headerPanel = new Panel
         {
-            BackColor = System.Drawing.Color.FromArgb(59, 130, 196),
+            BackColor = System.Drawing.Color.FromArgb(31, 34, 52), // Dark header like Bitwarden
             Dock = DockStyle.Top,
             Height = 60
         };
@@ -756,7 +759,7 @@ public partial class Form1 : Form
             Text = "Developed by ShioDev",
             ForeColor = System.Drawing.Color.White,
             LinkColor = System.Drawing.Color.White,
-            ActiveLinkColor = System.Drawing.Color.FromArgb(230, 240, 255),
+            ActiveLinkColor = System.Drawing.Color.FromArgb(175, 185, 209), // Lighter color for hover
             VisitedLinkColor = System.Drawing.Color.White,
             Font = new System.Drawing.Font("Segoe UI", 9F, System.Drawing.FontStyle.Regular),
             AutoSize = true
@@ -773,7 +776,8 @@ public partial class Form1 : Form
         Panel mainPanel = new Panel
         {
             Dock = DockStyle.Fill,
-            Padding = new Padding(20)
+            Padding = new Padding(20),
+            BackColor = System.Drawing.Color.FromArgb(20, 21, 30) // Dark background like Bitwarden
         };
         
         // Create left panel for controls
@@ -782,17 +786,17 @@ public partial class Form1 : Form
             Width = 220,
             Height = 350,
             Location = new System.Drawing.Point(20, 20),
-            BackColor = System.Drawing.Color.White,
+            BackColor = System.Drawing.Color.FromArgb(31, 34, 52), // Dark panel like Bitwarden
             BorderStyle = BorderStyle.None
         };
         
         // Add shadow effect
         leftPanel.Paint += (sender, e) => {
             ControlPaint.DrawBorder(e.Graphics, leftPanel.ClientRectangle,
-                System.Drawing.Color.FromArgb(230, 230, 230), 1, ButtonBorderStyle.Solid,
-                System.Drawing.Color.FromArgb(230, 230, 230), 1, ButtonBorderStyle.Solid,
-                System.Drawing.Color.FromArgb(190, 190, 190), 2, ButtonBorderStyle.Solid,
-                System.Drawing.Color.FromArgb(190, 190, 190), 2, ButtonBorderStyle.Solid);
+                System.Drawing.Color.FromArgb(41, 44, 62), 1, ButtonBorderStyle.Solid,
+                System.Drawing.Color.FromArgb(41, 44, 62), 1, ButtonBorderStyle.Solid,
+                System.Drawing.Color.FromArgb(51, 54, 72), 2, ButtonBorderStyle.Solid,
+                System.Drawing.Color.FromArgb(51, 54, 72), 2, ButtonBorderStyle.Solid);
         };
         
         // Create right panel for status and display
@@ -801,17 +805,17 @@ public partial class Form1 : Form
             Width = 360,
             Height = 350,
             Location = new System.Drawing.Point(250, 20),
-            BackColor = System.Drawing.Color.White,
+            BackColor = System.Drawing.Color.FromArgb(31, 34, 52), // Dark panel like Bitwarden
             BorderStyle = BorderStyle.None
         };
         
         // Add shadow effect
         rightPanel.Paint += (sender, e) => {
             ControlPaint.DrawBorder(e.Graphics, rightPanel.ClientRectangle,
-                System.Drawing.Color.FromArgb(230, 230, 230), 1, ButtonBorderStyle.Solid,
-                System.Drawing.Color.FromArgb(230, 230, 230), 1, ButtonBorderStyle.Solid,
-                System.Drawing.Color.FromArgb(190, 190, 190), 2, ButtonBorderStyle.Solid,
-                System.Drawing.Color.FromArgb(190, 190, 190), 2, ButtonBorderStyle.Solid);
+                System.Drawing.Color.FromArgb(41, 44, 62), 1, ButtonBorderStyle.Solid,
+                System.Drawing.Color.FromArgb(41, 44, 62), 1, ButtonBorderStyle.Solid,
+                System.Drawing.Color.FromArgb(51, 54, 72), 2, ButtonBorderStyle.Solid,
+                System.Drawing.Color.FromArgb(51, 54, 72), 2, ButtonBorderStyle.Solid);
         };
         
         // Mode selection group box
@@ -821,7 +825,8 @@ public partial class Form1 : Form
             Location = new System.Drawing.Point(15, 15),
             Size = new System.Drawing.Size(190, 80),
             Font = new System.Drawing.Font("Segoe UI", 9F, System.Drawing.FontStyle.Regular),
-            ForeColor = System.Drawing.Color.FromArgb(59, 130, 196)
+            ForeColor = System.Drawing.Color.White,
+            BackColor = System.Drawing.Color.FromArgb(31, 34, 52) // Dark background like Bitwarden
         };
         
         // Create radio buttons for mode selection
@@ -832,7 +837,9 @@ public partial class Form1 : Form
             AutoSize = true,
             Location = new System.Drawing.Point(15, 25),
             Font = new System.Drawing.Font("Segoe UI", 9F, System.Drawing.FontStyle.Regular),
-            Cursor = Cursors.Hand
+            Cursor = Cursors.Hand,
+            ForeColor = System.Drawing.Color.White,
+            BackColor = System.Drawing.Color.FromArgb(31, 34, 52) // Dark background like Bitwarden
         };
         
         RadioButton stringModeRadio = new RadioButton
@@ -841,7 +848,9 @@ public partial class Form1 : Form
             AutoSize = true,
             Location = new System.Drawing.Point(15, 50),
             Font = new System.Drawing.Font("Segoe UI", 9F, System.Drawing.FontStyle.Regular),
-            Cursor = Cursors.Hand
+            Cursor = Cursors.Hand,
+            ForeColor = System.Drawing.Color.White,
+            BackColor = System.Drawing.Color.FromArgb(31, 34, 52) // Dark background like Bitwarden
         };
         
         // Add event handlers for radio buttons
@@ -872,12 +881,12 @@ public partial class Form1 : Form
             Size = new System.Drawing.Size(190, 50),
             Location = new System.Drawing.Point(15, 105),
             FlatStyle = FlatStyle.Flat,
-            BackColor = System.Drawing.Color.FromArgb(59, 130, 196),
+            BackColor = System.Drawing.Color.FromArgb(84, 130, 210), // Bitwarden accent blue
             ForeColor = System.Drawing.Color.White,
             Font = new System.Drawing.Font("Segoe UI", 12F, System.Drawing.FontStyle.Bold),
             Cursor = Cursors.Hand
         };
-        toggleButton.FlatAppearance.BorderColor = System.Drawing.Color.FromArgb(59, 130, 196);
+        toggleButton.FlatAppearance.BorderColor = System.Drawing.Color.FromArgb(84, 130, 210); // Match the background
         toggleButton.Click += (sender, e) => ToggleRecognition(toggleButton);
         leftPanel.Controls.Add(toggleButton);
         
@@ -888,12 +897,12 @@ public partial class Form1 : Form
             Size = new System.Drawing.Size(190, 40),
             Location = new System.Drawing.Point(15, 165),
             FlatStyle = FlatStyle.Flat,
-            BackColor = System.Drawing.Color.FromArgb(230, 230, 230),
-            ForeColor = System.Drawing.Color.FromArgb(40, 40, 40),
+            BackColor = System.Drawing.Color.FromArgb(41, 44, 62), // Darker button
+            ForeColor = System.Drawing.Color.White,
             Font = new System.Drawing.Font("Segoe UI", 10F, System.Drawing.FontStyle.Regular),
             Cursor = Cursors.Hand
         };
-        clearTextButton.FlatAppearance.BorderColor = System.Drawing.Color.FromArgb(200, 200, 200);
+        clearTextButton.FlatAppearance.BorderColor = System.Drawing.Color.FromArgb(51, 54, 72);
         
         clearTextButton.Click += (sender, e) => 
         {
@@ -912,12 +921,12 @@ public partial class Form1 : Form
             Size = new System.Drawing.Size(190, 40),
             Location = new System.Drawing.Point(15, 165 + 45), // Position below clear button
             FlatStyle = FlatStyle.Flat,
-            BackColor = System.Drawing.Color.FromArgb(230, 230, 230),
-            ForeColor = System.Drawing.Color.FromArgb(40, 40, 40),
+            BackColor = System.Drawing.Color.FromArgb(41, 44, 62), // Darker button
+            ForeColor = System.Drawing.Color.White,
             Font = new System.Drawing.Font("Segoe UI", 10F, System.Drawing.FontStyle.Regular),
             Cursor = Cursors.Hand
         };
-        copyTextButton.FlatAppearance.BorderColor = System.Drawing.Color.FromArgb(200, 200, 200);
+        copyTextButton.FlatAppearance.BorderColor = System.Drawing.Color.FromArgb(51, 54, 72);
         
         copyTextButton.Click += (sender, e) => 
         {
@@ -934,26 +943,37 @@ public partial class Form1 : Form
         {
             Text = "Recognition Settings",
             Location = new System.Drawing.Point(15, 215 + 45), // Adjust position for new copy button
-            Size = new System.Drawing.Size(190, 70),
+            Size = new System.Drawing.Size(190, 75),
             Font = new System.Drawing.Font("Segoe UI", 9F, System.Drawing.FontStyle.Regular),
-            ForeColor = System.Drawing.Color.FromArgb(59, 130, 196)
+            ForeColor = System.Drawing.Color.White,
+            BackColor = System.Drawing.Color.FromArgb(31, 34, 52) // Dark background like Bitwarden
         };
         
-        // Add checkbox for Whisper
-        useWhisperCheckbox = new CheckBox
+        // Create label instead of checkbox for better styling
+        useWhisperLabel = new Label
         {
-            Text = "Use AI Recognition",
-            Checked = useWhisperForString,
-            Enabled = isWhisperReady,
+            Text = "☐ Use AI Recognition",  // Unchecked box character
             AutoSize = true,
             Location = new System.Drawing.Point(15, 25),
             Font = new System.Drawing.Font("Segoe UI", 9F, System.Drawing.FontStyle.Regular),
-            Cursor = Cursors.Hand
+            Cursor = Cursors.Hand,
+            ForeColor = System.Drawing.Color.White,
+            BackColor = System.Drawing.Color.FromArgb(31, 34, 52)
         };
         
-        useWhisperCheckbox.CheckedChanged += (sender, e) => 
+        // Set initial state
+        if (useWhisperForString)
         {
-            useWhisperForString = useWhisperCheckbox.Checked;
+            useWhisperLabel.Text = "☑ Use AI Recognition";  // Checked box character
+        }
+        
+        // Add click handler to toggle
+        useWhisperLabel.Click += (sender, e) => 
+        {
+            useWhisperForString = !useWhisperForString;
+            useWhisperLabel.Text = useWhisperForString ? 
+                "☑ Use AI Recognition" : 
+                "☐ Use AI Recognition";
         };
         
         // Add Whisper model info as a simple label
@@ -963,7 +983,7 @@ public partial class Form1 : Form
             AutoSize = true,
             Location = new System.Drawing.Point(15, 45),
             Font = new System.Drawing.Font("Segoe UI", 9F, System.Drawing.FontStyle.Regular),
-            ForeColor = System.Drawing.Color.FromArgb(80, 80, 80)
+            ForeColor = System.Drawing.Color.FromArgb(150, 165, 195) // Medium gray-blue for model text
         };
         
         // Hidden reset model button (keeping the reference for code compatibility)
@@ -976,7 +996,7 @@ public partial class Form1 : Form
         };
         
         // Add components to settings group
-        settingsGroupBox.Controls.Add(useWhisperCheckbox);
+        settingsGroupBox.Controls.Add(useWhisperLabel);
         settingsGroupBox.Controls.Add(modelLabel);
         settingsGroupBox.Controls.Add(resetModelButton);
         
@@ -988,20 +1008,20 @@ public partial class Form1 : Form
             Width = 340,
             Height = 70,
             Location = new System.Drawing.Point(10, 10),
-            BackColor = System.Drawing.Color.FromArgb(245, 248, 250),
+            BackColor = System.Drawing.Color.FromArgb(25, 27, 38), // Slightly lighter than main background
             BorderStyle = BorderStyle.FixedSingle
         };
         
         // Create a status label
         Label statusLabel = new Label
         {
-            Text = "Status: Not Listening",
+            Text = "Whisper ready with medium model - start listening",
             AutoSize = false,
             Width = 320,
             Height = 25,
             Location = new System.Drawing.Point(10, 10),
             Font = new System.Drawing.Font("Segoe UI", 9F, System.Drawing.FontStyle.Regular),
-            ForeColor = System.Drawing.Color.FromArgb(80, 80, 80)
+            ForeColor = System.Drawing.Color.FromArgb(123, 162, 217) // Lighter blue for status text
         };
         this.Tag = statusLabel; // Store reference to update later
         statusPanel.Controls.Add(statusLabel);
@@ -1024,7 +1044,7 @@ public partial class Form1 : Form
             AutoSize = true,
             Location = new System.Drawing.Point(10, 40),
             Font = new System.Drawing.Font("Segoe UI", 10F, System.Drawing.FontStyle.Bold),
-            ForeColor = System.Drawing.Color.FromArgb(59, 130, 196)
+            ForeColor = System.Drawing.Color.FromArgb(123, 162, 217) // Match the status text color
         };
         statusPanel.Controls.Add(modeIndicatorLabel);
         rightPanel.Controls.Add(statusPanel);
@@ -1036,7 +1056,7 @@ public partial class Form1 : Form
             AutoSize = true,
             Location = new System.Drawing.Point(10, 90),
             Font = new System.Drawing.Font("Segoe UI", 10F, System.Drawing.FontStyle.Regular),
-            ForeColor = System.Drawing.Color.FromArgb(80, 80, 80)
+            ForeColor = System.Drawing.Color.FromArgb(175, 185, 209) // Light gray for text
         };
         rightPanel.Controls.Add(recognizedLabel);
         
@@ -1066,7 +1086,8 @@ public partial class Form1 : Form
             Location = new System.Drawing.Point(10, 115),
             Font = new System.Drawing.Font("Segoe UI", 10F, System.Drawing.FontStyle.Regular),
             BorderStyle = BorderStyle.FixedSingle,
-            BackColor = System.Drawing.Color.White,
+            BackColor = System.Drawing.Color.FromArgb(25, 27, 38), // Slightly lighter than main background
+            ForeColor = System.Drawing.Color.White,
             Multiline = true,
             ReadOnly = true,
             ScrollBars = ScrollBars.Vertical,
@@ -1111,7 +1132,7 @@ public partial class Form1 : Form
             Width = 600,
             Height = 120,
             Location = new System.Drawing.Point(20, 380),
-            BackColor = System.Drawing.Color.FromArgb(240, 248, 255),
+            BackColor = System.Drawing.Color.FromArgb(31, 34, 52), // Dark panel like Bitwarden
             BorderStyle = BorderStyle.FixedSingle
         };
         
@@ -1122,7 +1143,7 @@ public partial class Form1 : Form
             AutoSize = true,
             Location = new System.Drawing.Point(10, 8),
             Font = new System.Drawing.Font("Segoe UI", 10F, System.Drawing.FontStyle.Bold),
-            ForeColor = System.Drawing.Color.FromArgb(59, 130, 196)
+            ForeColor = System.Drawing.Color.FromArgb(84, 130, 210) // Bitwarden accent blue
         };
         instructionsPanel.Controls.Add(instructionsHeader);
         
@@ -1132,13 +1153,13 @@ public partial class Form1 : Form
             Text = "• Command Mode: Say commands like \"up\", \"down\", \"enter\", \"control c\" for copy.\n" +
                   "• String Mode: Speak naturally and the system will automatically stop after 1.5 seconds of silence.\n" +
                   "• Say \"command option\" or \"string option\" to switch between modes at any time.\n" +
-                  "• Recording indicator: ● Gray = Not recording, ● Green = Recording in progress.\n" +
+                  "• Recording indicator: ● Gray = Not recording, ● Blue = Recording in progress.\n" +
                   "• You can scroll through recognized text and copy it using the \"Copy Text\" button or right-click menu.",
             AutoSize = true,
             Location = new System.Drawing.Point(10, 30),
             Size = new System.Drawing.Size(580, 0),
             Font = new System.Drawing.Font("Segoe UI", 9F, System.Drawing.FontStyle.Regular),
-            ForeColor = System.Drawing.Color.FromArgb(60, 60, 60)
+            ForeColor = System.Drawing.Color.FromArgb(175, 185, 209) // Light gray for text
         };
         instructionsPanel.Controls.Add(instructionsLabel);
         
@@ -1597,7 +1618,7 @@ public partial class Form1 : Form
             StopListening();
             isListening = false;
             button.Text = "Start Listening";
-            button.BackColor = System.Drawing.Color.FromArgb(59, 130, 196);
+            button.BackColor = System.Drawing.Color.FromArgb(84, 130, 210); // Use Bitwarden blue
             
             // Update UI
             UpdateStatusLabel("Status: Not Listening");
@@ -1639,11 +1660,11 @@ public partial class Form1 : Form
             // Update recording status dot
             if (recordingStatusLabel != null)
             {
-                // Update color based on recording status
+                // Update the recording status indicator color
                 recordingStatusLabel.ForeColor = isRecording 
-                    ? System.Drawing.Color.FromArgb(0, 160, 0) // Green dot for recording
+                    ? System.Drawing.Color.FromArgb(84, 180, 210) // Bright blue for recording instead of green
                     : System.Drawing.Color.Gray;
-                
+                    
                 // Add a tooltip to explain the indicator
                 ToolTip tooltip = new ToolTip();
                 tooltip.SetToolTip(recordingStatusLabel, isRecording 
@@ -1665,7 +1686,7 @@ public partial class Form1 : Form
                     flashTimer.Start();
                     
                     // Set initial colors
-                    speakingNowLabel.BackColor = System.Drawing.Color.FromArgb(0, 160, 0);
+                    speakingNowLabel.BackColor = System.Drawing.Color.FromArgb(84, 130, 210); // Bitwarden blue
                     speakingNowLabel.Text = "● SPEAK NOW - WILL PAUSE AFTER 1.5s SILENCE ●";
                 }
                 else if (flashTimer != null)
@@ -1695,25 +1716,26 @@ public partial class Form1 : Form
 
     private void InitializeFlashTimer()
     {
-        // Create and configure the timer for flashing the speaking indicator
         flashTimer = new System.Windows.Forms.Timer();
         flashTimer.Interval = 500; // Flash every half second
-        flashTimer.Tick += (sender, e) => {
+        flashTimer.Tick += (sender, e) => 
+        {
             if (speakingNowLabel != null && speakingNowLabel.Visible)
             {
-                // Toggle between green and a darker green for the flash effect
-                if (speakingNowLabel.BackColor == System.Drawing.Color.FromArgb(0, 160, 0))
+                // Toggle between two shades of blue
+                if (speakingNowLabel.BackColor == System.Drawing.Color.FromArgb(84, 130, 210))
                 {
-                    speakingNowLabel.BackColor = System.Drawing.Color.FromArgb(0, 120, 0);
-                    speakingNowLabel.Text = "SPEAK NOW - WILL PAUSE AFTER 1.5s SILENCE";
+                    // Darker blue
+                    speakingNowLabel.BackColor = System.Drawing.Color.FromArgb(64, 110, 190);
                 }
                 else
                 {
-                    speakingNowLabel.BackColor = System.Drawing.Color.FromArgb(0, 160, 0);
-                    speakingNowLabel.Text = "● SPEAK NOW - WILL PAUSE AFTER 1.5s SILENCE ●";
+                    // Back to normal blue
+                    speakingNowLabel.BackColor = System.Drawing.Color.FromArgb(84, 130, 210);
                 }
             }
         };
+        flashTimer.Start();
     }
 
     // Clean up resources
@@ -1761,8 +1783,8 @@ public partial class Form1 : Form
             else
             {
                 // Default values if parent form not accessible
-                appVersion = "1.0.1";
-                buildNumber = "1001";
+                appVersion = "1.0.2";
+                buildNumber = "1002";
             }
             
             InitializeAboutBox();
@@ -1778,7 +1800,7 @@ public partial class Form1 : Form
             this.MinimizeBox = false;
             this.StartPosition = FormStartPosition.CenterParent;
             this.ShowInTaskbar = false;
-            this.BackColor = System.Drawing.Color.White;
+            this.BackColor = System.Drawing.Color.FromArgb(20, 21, 30); // Dark background like Bitwarden
             
             // Use the same icon as the main form
             try
@@ -1834,7 +1856,7 @@ public partial class Form1 : Form
             {
                 Text = "AI Voice Keyboard",
                 Font = new Font("Segoe UI", 16, FontStyle.Bold),
-                ForeColor = System.Drawing.Color.FromArgb(59, 130, 196),
+                ForeColor = System.Drawing.Color.White,
                 Location = new Point(110, 30),
                 AutoSize = true
             };
@@ -1844,6 +1866,7 @@ public partial class Form1 : Form
             {
                 Text = $"Version: v{appVersion} (Build {buildNumber})",
                 Font = new Font("Segoe UI", 10),
+                ForeColor = System.Drawing.Color.FromArgb(175, 185, 209), // Light gray for text
                 Location = new Point(110, 65),
                 AutoSize = true
             };
@@ -1853,6 +1876,7 @@ public partial class Form1 : Form
             {
                 Text = "Developer:",
                 Font = new Font("Segoe UI", 10),
+                ForeColor = System.Drawing.Color.FromArgb(175, 185, 209), // Light gray for text
                 Location = new Point(30, 120),
                 AutoSize = true
             };
@@ -1862,6 +1886,10 @@ public partial class Form1 : Form
             {
                 Text = "ShioDev",
                 Font = new Font("Segoe UI", 10, FontStyle.Bold),
+                ForeColor = System.Drawing.Color.White,
+                LinkColor = System.Drawing.Color.White,
+                ActiveLinkColor = System.Drawing.Color.FromArgb(175, 185, 209), // Light blue hover
+                VisitedLinkColor = System.Drawing.Color.White,
                 Location = new Point(110, 120),
                 AutoSize = true
             };
@@ -1872,7 +1900,7 @@ public partial class Form1 : Form
             {
                 Text = "https://hello.shiodev.com",
                 Font = new Font("Segoe UI", 9),
-                ForeColor = System.Drawing.Color.FromArgb(100, 100, 100),
+                ForeColor = System.Drawing.Color.FromArgb(120, 130, 154), // Muted text
                 Location = new Point(110, 145),
                 AutoSize = true
             };
@@ -1882,6 +1910,7 @@ public partial class Form1 : Form
             {
                 Text = "Powered by:",
                 Font = new Font("Segoe UI", 10),
+                ForeColor = System.Drawing.Color.FromArgb(175, 185, 209), // Light gray for text
                 Location = new Point(30, 180),
                 AutoSize = true
             };
@@ -1889,8 +1918,12 @@ public partial class Form1 : Form
             // Foundation link
             LinkLabel foundationLinkLabel = new LinkLabel
             {
-                Text = "BeaverFoundation",
+                Text = "Beaver Foundation",
                 Font = new Font("Segoe UI", 10, FontStyle.Bold),
+                ForeColor = System.Drawing.Color.White,
+                LinkColor = System.Drawing.Color.White,
+                ActiveLinkColor = System.Drawing.Color.FromArgb(175, 185, 209), // Light blue hover
+                VisitedLinkColor = System.Drawing.Color.White,
                 Location = new Point(110, 180),
                 AutoSize = true
             };
@@ -1901,7 +1934,7 @@ public partial class Form1 : Form
             {
                 Text = "https://beaver.foundation",
                 Font = new Font("Segoe UI", 9),
-                ForeColor = System.Drawing.Color.FromArgb(100, 100, 100),
+                ForeColor = System.Drawing.Color.FromArgb(120, 130, 154), // Muted text
                 Location = new Point(110, 205),
                 AutoSize = true
             };
@@ -1911,6 +1944,7 @@ public partial class Form1 : Form
             {
                 Text = "License:",
                 Font = new Font("Segoe UI", 10),
+                ForeColor = System.Drawing.Color.FromArgb(175, 185, 209), // Light gray for text
                 Location = new Point(30, 240),
                 AutoSize = true
             };
@@ -1920,6 +1954,10 @@ public partial class Form1 : Form
             {
                 Text = "GPL 3.0",
                 Font = new Font("Segoe UI", 10, FontStyle.Bold),
+                ForeColor = System.Drawing.Color.White,
+                LinkColor = System.Drawing.Color.White,
+                ActiveLinkColor = System.Drawing.Color.FromArgb(175, 185, 209), // Light blue hover
+                VisitedLinkColor = System.Drawing.Color.White,
                 Location = new Point(110, 240),
                 AutoSize = true
             };
@@ -1932,9 +1970,10 @@ public partial class Form1 : Form
                 Size = new Size(80, 30),
                 Location = new Point(this.Width / 2 - 40, 280),
                 FlatStyle = FlatStyle.Flat,
-                BackColor = System.Drawing.Color.FromArgb(59, 130, 196),
+                BackColor = System.Drawing.Color.FromArgb(84, 130, 210), // Bitwarden accent blue
                 ForeColor = System.Drawing.Color.White
             };
+            okButton.FlatAppearance.BorderColor = System.Drawing.Color.FromArgb(84, 130, 210); // Match the button color
             okButton.Click += (s, e) => this.Close();
             
             // Add controls to the form
