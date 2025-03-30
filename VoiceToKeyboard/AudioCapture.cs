@@ -26,10 +26,10 @@ namespace VoiceToKeyboard
         private const int SampleRate = 16000;         // 16kHz is optimal for Whisper
         private const int BitsPerSample = 16;         // 16-bit audio
         private const int Channels = 1;               // Mono
-        private const int RecordingLengthMs = 2500;   // 2.5 seconds max recording before processing (reduced from 5s)
+        private const int RecordingLengthMs = 10000;  // 10 seconds max recording before processing (increased from 2.5s)
         private const float SilenceThreshold = 0.02f; // Threshold to detect speech
-        private const int MinimumAudioLength = 500;   // Minimum length in milliseconds (reduced from 1000ms)
-        private const int SilenceDetectionMs = 750;   // Detect silence after 750ms for quicker word detection
+        private const int MinimumAudioLength = 500;   // Minimum length in milliseconds
+        private const int SilenceDetectionMs = 1500;  // Detect silence after 1.5 seconds
         
         public async Task StartRecordingAsync(CancellationToken cancellationToken)
         {
@@ -78,15 +78,15 @@ namespace VoiceToKeyboard
                         // or hit maximum recording length
                         while (elapsedTime < RecordingLengthMs && !hasFinishedNaturally && !cancellationToken.IsCancellationRequested)
                         {
-                            await Task.Delay(50, cancellationToken); // Check more frequently (50ms instead of 100ms)
+                            await Task.Delay(50, cancellationToken); // Check every 50ms
                             elapsedTime += 50;
                             
                             // If we've detected speech and now there's silence again
-                            // Reduce silence duration needed to finish - 8 * 50ms = 400ms silence
-                            if (_hasSpeech && _silenceCounter >= 8) 
+                            // 1500ms silence = 30 * 50ms = 30 counts
+                            if (_hasSpeech && _silenceCounter >= 30) 
                             {
                                 hasFinishedNaturally = true;
-                                RaiseStatusChanged("Word detected, processing...");
+                                RaiseStatusChanged("Speech ended, processing...");
                             }
                         }
                         

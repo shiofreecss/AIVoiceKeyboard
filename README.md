@@ -1,11 +1,15 @@
-# AI Voice to Keyboard Converter (v1.0.0)
+# AI Voice to Keyboard Converter (v1.0.1)
 
 A Windows application that converts voice commands to keyboard inputs, allowing hands-free control of your computer. The application offers both Windows Speech Recognition and OpenAI Whisper for more accurate speech-to-text capabilities.
+
+Developed by [ShioDev](https://hello.shiodev.com) | Powered by [BeaverFoundation](https://beaver.foundation)
 
 ## Features
 
 - Converts voice commands to keyboard inputs
 - Real-time word-by-word speech recognition 
+- Automatic pause after 1.5 seconds of silence in String Mode
+- Enhanced noise filtering for cleaner transcription
 - Supports basic navigation keys (arrows, enter, space, etc.)
 - Supports function keys (F1-F12)
 - Supports keyboard shortcuts (Ctrl+C, Ctrl+V, Alt+Tab, etc.)
@@ -15,7 +19,6 @@ A Windows application that converts voice commands to keyboard inputs, allowing 
 - Advanced speech recognition using OpenAI's Whisper (offline, local processing)
 - Visual speaking indicator that shows when to talk in String Mode
 - Scrollable text display with copy functionality
-- Filters out noise annotations like (keyboard tapping), [buzzer], etc.
 - Simple, easy-to-use interface
 - Real-time status updates
 
@@ -127,13 +130,35 @@ The application uses OpenAI's Whisper for high-quality speech recognition in Str
    - **String Mode**: For typing spoken text
 3. Check "Use AI Recognition" for more accurate speech recognition (requires model file)
 4. Click "Start Listening" button
-5. In String Mode, a green "SPEAKING NOW - PLEASE TALK" indicator will appear when you can speak
-6. Speak your commands or text - words will appear as you speak
+5. In String Mode, a green "SPEAK NOW - WILL PAUSE AFTER 1.5s SILENCE" indicator will appear when you can speak
+6. Speak your commands or text - recording will automatically pause after 1.5 seconds of silence
 7. The recognized speech will be displayed in the text area and typed automatically in real-time
 8. Use the scrollbar to view longer text and the "Copy Text" button to copy to clipboard
-9. Click "Stop Listening" to pause voice recognition
+9. Click "Stop Listening" when you're done with voice recognition
 
-## New Features in v1.0.0
+## New Features in v1.0.1 (Current)
+
+### Enhanced Noise Filtering
+- Comprehensive filtering of noise annotations in various formats:
+  - Asterisk-enclosed noise like *cough*, *sad music*
+  - Parentheses, brackets, curly braces, and other delimiters
+  - Common sound effect words with surrounding punctuation
+- Intelligent text cleanup with proper capitalization and punctuation
+- Better handling of sentences with balanced delimiters
+
+### Automatic Speech Pause Detection
+- Recording automatically stops after 1.5 seconds of silence
+- No need to manually stop recording between phrases
+- More natural speech flow with automatic pausing
+- Visual indicator shows "WILL PAUSE AFTER 1.5s SILENCE"
+
+### Improved Text Processing
+- Better sentence handling with proper punctuation
+- Fixed standalone "i" to proper "I" capitalization
+- Appropriate spacing around punctuation marks
+- Balanced delimiters for quotes and parentheses
+
+## Features from v1.0.0
 
 ### Real-time Word-by-Word Recognition
 - Words appear as you speak them, without waiting for full sentences

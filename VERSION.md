@@ -1,6 +1,27 @@
-# AI Voice to Keyboard - Version History
+# AI Voice to Keyboard Converter - Version History
 
-## Version 1.0.0 (Current) - March 28, 2025
+## v1.0.1 (Current)
+
+### Improvements
+- Added automatic pause after 1.5 seconds of silence in String Mode
+- Enhanced noise filtering to remove various sound effect annotations:
+  - Asterisk-enclosed noise like *cough*, *sad music*
+  - Curly brace annotations like {sound effects}
+  - Hash-surrounded noise like #background noise#
+  - Tilde-enclosed items like ~background noise~
+- Added filtering for common sound effect words (cough, sigh, laugh, music, etc.)
+- Improved text cleanup after noise removal:
+  - Better capitalization handling
+  - Proper spacing around punctuation
+  - Fixed standalone "i" to "I"
+  - Balanced delimiters for quotes and parentheses
+- Updated UI to reflect automatic silence detection
+
+### Bug Fixes
+- Fixed processing of longer audio segments with appropriate timeouts
+- Improved sentence handling with proper punctuation
+
+## v1.0.0 (Initial Release)
 
 ### New Features
 - **Real-time Word Recognition**: Added real-time word-by-word processing for more responsive dictation
@@ -11,20 +32,16 @@
 - **Noise Filtering**: Automatically removes noise annotations like (keyboard tapping), [buzzer], etc.
 - **UI Improvements**: Updated color scheme and indicators for better visual feedback
 
-### Technical Improvements
-- Switched to medium Whisper model (1.5GB) for better accuracy
-- Reduced minimum audio length from 1000ms to 500ms for faster word detection
-- Implemented 1.5 second timeout for Whisper processing to maintain responsiveness
-- Added word-by-word text output with feedback after each recognized word
-- Improved error handling and recovery for more stable operation
-
-### UI Changes
-- Added right-click context menu with Copy, Select All, and Clear options
-- Updated application title to "AI Voice to Keyboard v1.0.2"
-- Improved status messages with clear real-time feedback
-- Added visual indicator showing when recording is active
-- Adjusted layout for better usability
-
-## Version 0.1 - March 20, 2025
-
-Initial release with basic functionality.
+### Core Features
+- Converts voice commands to keyboard inputs
+- Two recognition modes:
+  - Command Mode: Execute keyboard commands and shortcuts
+  - String Mode: Type spoken text directly with real-time word detection
+- Support for basic navigation keys (arrows, enter, space, etc.)
+- Support for function keys (F1-F12)
+- Support for keyboard shortcuts (Ctrl+C, Ctrl+V, Alt+Tab, etc.)
+- Advanced speech recognition using OpenAI's Whisper (offline, local processing)
+- Visual speaking indicator that shows when to talk in String Mode
+- Scrollable text display with copy functionality
+- Basic noise annotation filtering
+- Real-time status updates

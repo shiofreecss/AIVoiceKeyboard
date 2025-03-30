@@ -37,6 +37,11 @@ public partial class Form1 : Form
     private string currentWhisperModel = "ggml-medium.bin"; // Default medium model
     private Button? resetModelButton; // Renamed from downloadModelButton
     
+    // Audio constants for processing time calculation
+    private const int SampleRate = 16000;     // 16kHz is optimal for Whisper
+    private const int BitsPerSample = 16;     // 16-bit audio
+    private const int Channels = 1;           // Mono
+
     // Import SendInput from user32.dll
     [DllImport("user32.dll")]
     static extern uint SendInput(uint nInputs, INPUT[] pInputs, int cbSize);
@@ -273,10 +278,9 @@ public partial class Form1 : Form
         
         try
         {
-            UpdateStatusLabel($"Processing word ({audioData.Length} bytes)...");
+            UpdateStatusLabel($"Processing speech ({audioData.Length / 1024} KB)...");
             
-            // For real-time processing, we process even smaller audio segments
-            // but we still want to filter out obvious silence
+            // For real-time processing, but we still want to filter out obvious silence
             if (audioData.Length < 500)
             {
                 UpdateStatusLabel("Audio too short, ignoring");
@@ -285,17 +289,22 @@ public partial class Form1 : Form
                 return;
             }
             
-            // Set timeout for word processing to maintain responsiveness
+            // Calculate an appropriate timeout based on audio length
+            // Roughly 1 second processing time per 2 seconds of audio, with minimum 2 seconds
+            int audioLengthMs = audioData.Length / (SampleRate * BitsPerSample * Channels / 8 / 1000);
+            int timeoutMs = Math.Max(2000, audioLengthMs / 2);
+            
+            // Set timeout for speech processing to maintain responsiveness
             var recognitionTask = whisperRecognition.ProcessAudioAsync(audioData);
             string recognizedText = await await Task.WhenAny(
                 recognitionTask, 
-                Task.Delay(1500).ContinueWith(_ => string.Empty) // 1.5 second timeout
+                Task.Delay(timeoutMs).ContinueWith(_ => string.Empty) // Dynamic timeout
             );
             
             // If timeout occurred, handle gracefully
             if (string.IsNullOrEmpty(recognizedText) && !recognitionTask.IsCompleted)
             {
-                UpdateStatusLabel("Word recognition timed out, continuing...");
+                UpdateStatusLabel("Speech recognition timed out, continuing...");
                 isProcessingAudio = false;
                 return;
             }
@@ -310,7 +319,7 @@ public partial class Form1 : Form
             else
             {
                 // No text was recognized, prepare for next capture
-                UpdateStatusLabel("No word detected, ready for next capture");
+                UpdateStatusLabel("No speech detected, ready for next capture");
             }
         }
         catch (Exception ex)
@@ -427,14 +436,45 @@ public partial class Form1 : Form
         if (string.IsNullOrWhiteSpace(text))
             return;
         
-        // Process the text - trim leading/trailing spaces and ensure proper capitalization
+        // Process the text - trim leading/trailing spaces
         text = text.Trim();
         
         // Filter out noise annotations like (keyboard tapping), [buzzer], <action>, etc.
         text = Regex.Replace(text, @"\([^)]*\)|\[[^\]]*\]|<[^>]*>", "").Trim();
         
+        // Filter out asterisk-enclosed noise annotations like *cough*, *sad music*, etc.
+        text = Regex.Replace(text, @"\*[^*]*\*", "").Trim();
+        
+        // Filter out common sound effect markers in various formats
+        text = Regex.Replace(text, @"\{[^}]*\}", "").Trim(); // {sound effects}
+        text = Regex.Replace(text, @"#[^#]*#", "").Trim();   // #sound effects#
+        text = Regex.Replace(text, @"~[^~]*~", "").Trim();   // ~background noise~
+        
+        // Filter out common sound effect words with surrounding punctuation
+        string[] noisePhrases = new[] { 
+            "\\bcough\\b", "\\bsigh\\b", "\\blaugh\\b", "\\bgasp\\b", 
+            "\\bmusic\\b", "\\bapplause\\b", "\\bsniff\\b", "\\bchuckle\\b", 
+            "\\blaughter\\b", "\\bbackground noise\\b", "\\bnoise\\b", "\\bsound\\b",
+            "\\bclears throat\\b", "\\bhumming\\b", "\\bexhales\\b", "\\binhales\\b"
+        };
+        
+        foreach (string phrase in noisePhrases)
+        {
+            // Remove annotations with the phrases in various formats
+            text = Regex.Replace(text, $"\\(.*{phrase}.*\\)", "", RegexOptions.IgnoreCase).Trim();
+            text = Regex.Replace(text, $"\\[.*{phrase}.*\\]", "", RegexOptions.IgnoreCase).Trim();
+            text = Regex.Replace(text, $"\\{{.*{phrase}.*\\}}", "", RegexOptions.IgnoreCase).Trim();
+            text = Regex.Replace(text, $"\\*.*{phrase}.*\\*", "", RegexOptions.IgnoreCase).Trim();
+            
+            // Also try to remove the standalone terms with optional punctuation
+            text = Regex.Replace(text, $"\\W*{phrase}\\W*", " ", RegexOptions.IgnoreCase).Trim();
+        }
+        
         // Remove extra spaces that might have been created by removing annotations
         text = Regex.Replace(text, @"\s+", " ").Trim();
+        
+        // Clean up and fix punctuation
+        text = CleanupText(text);
         
         // Skip if text is empty after filtering
         if (string.IsNullOrWhiteSpace(text))
@@ -452,10 +492,7 @@ public partial class Form1 : Form
             return;
         }
         
-        // Real-time word processing: Handle each word individually
-        string[] words = text.Split(new[] { ' ', '\t', '\n', '\r' }, StringSplitOptions.RemoveEmptyEntries);
-        
-        // First update the complete text in the UI
+        // Add the recognized text to the history
         typedText.Append(text + " ");
         if (typedTextBox != null)
         {
@@ -463,24 +500,114 @@ public partial class Form1 : Form
             ScrollToEnd(typedTextBox);
         }
         
-        // Then process words individually for immediate feedback
-        foreach (string word in words)
+        // Process the text for typing
+        bool isFirstWord = true;
+        string[] sentences = text.Split(new[] { '.', '!', '?' }, StringSplitOptions.RemoveEmptyEntries);
+        
+        foreach (string sentence in sentences)
         {
-            if (!string.IsNullOrWhiteSpace(word))
+            if (string.IsNullOrWhiteSpace(sentence))
+                continue;
+                
+            // Split into words
+            string[] words = sentence.Trim().Split(new[] { ' ', '\t', '\n', '\r' }, StringSplitOptions.RemoveEmptyEntries);
+            
+            foreach (string word in words)
             {
-                // Type the word character by character for immediate output
+                if (string.IsNullOrWhiteSpace(word))
+                    continue;
+                
+                // Add a space between words (but not before the first word)
+                if (!isFirstWord)
+                {
+                    SendUnicodeChar(' ');
+                }
+                
+                // Type the word character by character
                 foreach (char c in word)
                 {
                     SendUnicodeChar(c);
                 }
                 
-                // Add a space after each word
+                isFirstWord = false;
+            }
+            
+            // Add sentence end punctuation if there are multiple sentences
+            if (sentences.Length > 1)
+            {
+                SendUnicodeChar('.');
                 SendUnicodeChar(' ');
-                
-                // Update status with each word for responsive feedback
-                UpdateStatusLabel($"Word recognized: {word}");
             }
         }
+        
+        // Update status with recognized text summary
+        if (text.Length > 30)
+        {
+            UpdateStatusLabel($"Speech recognized: \"{text.Substring(0, 27)}...\"");
+        }
+        else
+        {
+            UpdateStatusLabel($"Speech recognized: \"{text}\"");
+        }
+    }
+
+    private string CleanupText(string text)
+    {
+        if (string.IsNullOrWhiteSpace(text))
+            return string.Empty;
+            
+        // Ensure proper spacing around punctuation
+        text = Regex.Replace(text, @"\s+([.,!?:;])", "$1");
+        
+        // Ensure first letter is capitalized
+        if (text.Length > 0)
+        {
+            text = char.ToUpper(text[0]) + text.Substring(1);
+        }
+        
+        // Fix common formatting issues
+        
+        // Fix "i" -> "I" (standalone pronoun)
+        text = Regex.Replace(text, @"\bi\b", "I");
+        
+        // Ensure proper spacing after punctuation
+        text = Regex.Replace(text, @"([.,!?:;])(\S)", "$1 $2");
+        
+        // Remove leading/trailing quotes and parentheses if they're not properly closed
+        text = BalanceDelimiters(text);
+        
+        return text;
+    }
+    
+    private string BalanceDelimiters(string text)
+    {
+        // Check for mismatched quotes
+        int singleQuotes = text.Count(c => c == '\'');
+        int doubleQuotes = text.Count(c => c == '\"');
+        
+        // Remove trailing single quote if unbalanced
+        if (singleQuotes % 2 != 0 && text.EndsWith("'"))
+        {
+            text = text.Substring(0, text.Length - 1);
+        }
+        
+        // Remove trailing double quote if unbalanced
+        if (doubleQuotes % 2 != 0 && text.EndsWith("\""))
+        {
+            text = text.Substring(0, text.Length - 1);
+        }
+        
+        // Check for mismatched parentheses
+        int openParens = text.Count(c => c == '(');
+        int closeParens = text.Count(c => c == ')');
+        
+        // Remove trailing close parenthesis if unbalanced
+        if (openParens < closeParens && text.EndsWith(")"))
+        {
+            text = text.Substring(0, text.Length - 1);
+        }
+        
+        return text;
     }
 
     private void UpdateStatusLabel(string status)
@@ -518,11 +645,39 @@ public partial class Form1 : Form
     private void InitializeUI()
     {
         // Change form title and appearance
-        this.Text = "AI Voice Keyboard - v1.0.0";
+        this.Text = "AI Voice Keyboard - v1.0.1";
         this.BackColor = System.Drawing.Color.FromArgb(245, 247, 250);
         this.FormBorderStyle = FormBorderStyle.FixedSingle;
         this.MaximizeBox = false;
-        this.Icon = new System.Drawing.Icon(System.Drawing.SystemIcons.Application, 40, 40);
+        
+        // Try to load the custom icon, fall back to system icon if not found
+        try
+        {
+            string iconPath = Path.Combine(Application.StartupPath, "icon", "ai-voice-keyboard.ico");
+            if (File.Exists(iconPath))
+            {
+                this.Icon = new System.Drawing.Icon(iconPath);
+            }
+            else
+            {
+                // Try relative path from executable directory
+                iconPath = Path.Combine("icon", "ai-voice-keyboard.ico");
+                if (File.Exists(iconPath))
+                {
+                    this.Icon = new System.Drawing.Icon(iconPath);
+                }
+                else
+                {
+                    // Fallback to system icon
+                    this.Icon = System.Drawing.SystemIcons.Application;
+                }
+            }
+        }
+        catch
+        {
+            // Fallback to system icon on any error
+            this.Icon = System.Drawing.SystemIcons.Application;
+        }
         
         // Create panel for header
         Panel headerPanel = new Panel
@@ -542,6 +697,25 @@ public partial class Form1 : Form
             Location = new System.Drawing.Point(20, 15)
         };
         headerPanel.Controls.Add(titleLabel);
+        
+        // Add developer link to bottom right of header
+        LinkLabel developerLink = new LinkLabel
+        {
+            Text = "Developed by ShioDev",
+            ForeColor = System.Drawing.Color.White,
+            LinkColor = System.Drawing.Color.White,
+            ActiveLinkColor = System.Drawing.Color.FromArgb(230, 240, 255),
+            VisitedLinkColor = System.Drawing.Color.White,
+            Font = new System.Drawing.Font("Segoe UI", 9F, System.Drawing.FontStyle.Regular),
+            AutoSize = true
+        };
+        developerLink.LinkBehavior = LinkBehavior.HoverUnderline;
+        developerLink.Click += DeveloperLink_Click;
+        headerPanel.Controls.Add(developerLink);
+        
+        // Anchor the developer link to the right of the header
+        developerLink.Anchor = AnchorStyles.Right | AnchorStyles.Bottom;
+        developerLink.Location = new System.Drawing.Point(headerPanel.Width - developerLink.Width - 20, 40);
         
         // Create main container panel
         Panel mainPanel = new Panel
@@ -817,7 +991,7 @@ public partial class Form1 : Form
         // Create speaking indicator (initially hidden)
         speakingNowLabel = new Label
         {
-            Text = "SPEAKING NOW - PLEASE TALK",
+            Text = "SPEAK NOW - WILL PAUSE AFTER 1.5s SILENCE",
             AutoSize = false,
             Width = 340,
             Height = 30,
@@ -904,7 +1078,7 @@ public partial class Form1 : Form
         Label instructionsLabel = new Label
         {
             Text = "• Command Mode: Say commands like \"up\", \"down\", \"enter\", \"control c\" for copy.\n" +
-                  "• String Mode: Speak clearly for real-time word-by-word recognition.\n" +
+                  "• String Mode: Speak naturally and the system will automatically stop after 1.5 seconds of silence.\n" +
                   "• Say \"command option\" or \"string option\" to switch between modes at any time.\n" +
                   "• Recording indicator: ● Gray = Not recording, ● Green = Recording in progress.\n" +
                   "• You can scroll through recognized text and copy it using the \"Copy Text\" button or right-click menu.",
@@ -1289,15 +1463,15 @@ public partial class Form1 : Form
                     {
                         try 
                         {
-                            UpdateStatusLabel("Listening for real-time words...");
+                            UpdateStatusLabel("Listening for speech - will pause after 1.5s of silence...");
                             
-                            // More frequent recording cycles for real-time word processing
+                            // Continuous recording with automatic silence detection
                             while (!cancellationTokenSource.Token.IsCancellationRequested)
                             {
                                 // Show recording is active
                                 UpdateRecordingStatus(true); 
                                 
-                                // Start recording session - this will stop automatically after word detection
+                                // Start recording session - this will stop automatically after silence detection
                                 await audioCapture.StartRecordingAsync(cancellationTokenSource.Token);
                                 
                                 // Only hide the indicator if we're done listening entirely
@@ -1306,8 +1480,8 @@ public partial class Form1 : Form
                                     UpdateRecordingStatus(false);
                                 }
                                 
-                                // Smaller delay between recordings for more real-time feel
-                                await Task.Delay(100, cancellationTokenSource.Token);
+                                // Allow a small delay between recording sessions
+                                await Task.Delay(300, cancellationTokenSource.Token);
                             }
                         }
                         catch (TaskCanceledException)
@@ -1440,7 +1614,7 @@ public partial class Form1 : Form
                     
                     // Set initial colors
                     speakingNowLabel.BackColor = System.Drawing.Color.FromArgb(0, 160, 0);
-                    speakingNowLabel.Text = "● SPEAKING NOW - PLEASE TALK ●";
+                    speakingNowLabel.Text = "● SPEAK NOW - WILL PAUSE AFTER 1.5s SILENCE ●";
                 }
                 else if (flashTimer != null)
                 {
@@ -1479,12 +1653,12 @@ public partial class Form1 : Form
                 if (speakingNowLabel.BackColor == System.Drawing.Color.FromArgb(0, 160, 0))
                 {
                     speakingNowLabel.BackColor = System.Drawing.Color.FromArgb(0, 120, 0);
-                    speakingNowLabel.Text = "SPEAKING NOW - PLEASE TALK";
+                    speakingNowLabel.Text = "SPEAK NOW - WILL PAUSE AFTER 1.5s SILENCE";
                 }
                 else
                 {
                     speakingNowLabel.BackColor = System.Drawing.Color.FromArgb(0, 160, 0);
-                    speakingNowLabel.Text = "● SPEAKING NOW - PLEASE TALK ●";
+                    speakingNowLabel.Text = "● SPEAK NOW - WILL PAUSE AFTER 1.5s SILENCE ●";
                 }
             }
         };
@@ -1508,4 +1682,207 @@ public partial class Form1 : Form
             flashTimer = null;
         }
     }
+
+    private void DeveloperLink_Click(object sender, EventArgs e)
+    {
+        // Show the about box with app information
+        using (AboutBox aboutBox = new AboutBox())
+        {
+            aboutBox.ShowDialog(this);
+        }
+    }
+    
+    // Custom AboutBox form for displaying app information
+    private class AboutBox : Form
+    {
+        public AboutBox()
+        {
+            InitializeAboutBox();
+        }
+        
+        private void InitializeAboutBox()
+        {
+            // Configure the form
+            this.Text = "About";
+            this.Size = new Size(450, 360);
+            this.FormBorderStyle = FormBorderStyle.FixedDialog;
+            this.MaximizeBox = false;
+            this.MinimizeBox = false;
+            this.StartPosition = FormStartPosition.CenterParent;
+            this.ShowInTaskbar = false;
+            this.BackColor = System.Drawing.Color.White;
+            
+            // Use the same icon as the main form
+            try
+            {
+                this.Icon = this.Owner.Icon;
+            }
+            catch
+            {
+                // Fallback silently
+            }
+            
+            // Load app logo
+            System.Drawing.Image logoImage;
+            try
+            {
+                string iconPath = Path.Combine(Application.StartupPath, "icon", "ai-voice-keyboard.png");
+                if (File.Exists(iconPath))
+                {
+                    logoImage = Image.FromFile(iconPath);
+                }
+                else
+                {
+                    // Try relative path
+                    iconPath = Path.Combine("icon", "ai-voice-keyboard.png");
+                    if (File.Exists(iconPath))
+                    {
+                        logoImage = Image.FromFile(iconPath);
+                    }
+                    else
+                    {
+                        // Fallback to system icon
+                        logoImage = System.Drawing.SystemIcons.Application.ToBitmap();
+                    }
+                }
+            }
+            catch
+            {
+                // Fallback to system icon on any error
+                logoImage = System.Drawing.SystemIcons.Application.ToBitmap();
+            }
+            
+            // App logo/icon
+            PictureBox logoBox = new PictureBox
+            {
+                Size = new Size(64, 64),
+                Location = new Point(30, 30),
+                SizeMode = PictureBoxSizeMode.StretchImage,
+                Image = logoImage
+            };
+            
+            // App title
+            Label titleLabel = new Label
+            {
+                Text = "AI Voice Keyboard",
+                Font = new Font("Segoe UI", 16, FontStyle.Bold),
+                ForeColor = System.Drawing.Color.FromArgb(59, 130, 196),
+                Location = new Point(110, 30),
+                AutoSize = true
+            };
+            
+            // Version info
+            Label versionLabel = new Label
+            {
+                Text = "Version: v1.0.1",
+                Font = new Font("Segoe UI", 10),
+                Location = new Point(110, 65),
+                AutoSize = true
+            };
+            
+            // Developer info
+            Label devLabel = new Label
+            {
+                Text = "Developer:",
+                Font = new Font("Segoe UI", 10),
+                Location = new Point(30, 120),
+                AutoSize = true
+            };
+            
+            // Developer link
+            LinkLabel devLinkLabel = new LinkLabel
+            {
+                Text = "ShioDev",
+                Font = new Font("Segoe UI", 10, FontStyle.Bold),
+                Location = new Point(110, 120),
+                AutoSize = true
+            };
+            devLinkLabel.LinkClicked += (s, e) => { System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo { FileName = "https://hello.shiodev.com", UseShellExecute = true }); };
+            
+            // Developer website
+            Label devUrlLabel = new Label
+            {
+                Text = "https://hello.shiodev.com",
+                Font = new Font("Segoe UI", 9),
+                ForeColor = System.Drawing.Color.FromArgb(100, 100, 100),
+                Location = new Point(110, 145),
+                AutoSize = true
+            };
+            
+            // Foundation info
+            Label foundationLabel = new Label
+            {
+                Text = "Powered by:",
+                Font = new Font("Segoe UI", 10),
+                Location = new Point(30, 180),
+                AutoSize = true
+            };
+            
+            // Foundation link
+            LinkLabel foundationLinkLabel = new LinkLabel
+            {
+                Text = "BeaverFoundation",
+                Font = new Font("Segoe UI", 10, FontStyle.Bold),
+                Location = new Point(110, 180),
+                AutoSize = true
+            };
+            foundationLinkLabel.LinkClicked += (s, e) => { System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo { FileName = "https://beaver.foundation", UseShellExecute = true }); };
+            
+            // Foundation website
+            Label foundationUrlLabel = new Label
+            {
+                Text = "https://beaver.foundation",
+                Font = new Font("Segoe UI", 9),
+                ForeColor = System.Drawing.Color.FromArgb(100, 100, 100),
+                Location = new Point(110, 205),
+                AutoSize = true
+            };
+            
+            // License info
+            Label licenseLabel = new Label
+            {
+                Text = "License:",
+                Font = new Font("Segoe UI", 10),
+                Location = new Point(30, 240),
+                AutoSize = true
+            };
+            
+            // License link
+            LinkLabel licenseLinkLabel = new LinkLabel
+            {
+                Text = "GPL 3.0",
+                Font = new Font("Segoe UI", 10, FontStyle.Bold),
+                Location = new Point(110, 240),
+                AutoSize = true
+            };
+            licenseLinkLabel.LinkClicked += (s, e) => { System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo { FileName = "https://www.gnu.org/licenses/gpl-3.0.en.html", UseShellExecute = true }); };
+            
+            // OK button
+            Button okButton = new Button
+            {
+                Text = "OK",
+                Size = new Size(80, 30),
+                Location = new Point(this.Width / 2 - 40, 280),
+                FlatStyle = FlatStyle.Flat,
+                BackColor = System.Drawing.Color.FromArgb(59, 130, 196),
+                ForeColor = System.Drawing.Color.White
+            };
+            okButton.Click += (s, e) => this.Close();
+            
+            // Add controls to the form
+            this.Controls.Add(logoBox);
+            this.Controls.Add(titleLabel);
+            this.Controls.Add(versionLabel);
+            this.Controls.Add(devLabel);
+            this.Controls.Add(devLinkLabel);
+            this.Controls.Add(devUrlLabel);
+            this.Controls.Add(foundationLabel);
+            this.Controls.Add(foundationLinkLabel);
+            this.Controls.Add(foundationUrlLabel);
+            this.Controls.Add(licenseLabel);
+            this.Controls.Add(licenseLinkLabel);
+            this.Controls.Add(okButton);
+        }
+    }
 }
+
