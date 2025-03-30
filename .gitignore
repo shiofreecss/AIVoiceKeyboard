@@ -33,3 +33,20 @@ Thumbs.db
 /VoiceToKeyboard/bin/Debug
 /VoiceToKeyboard/bin/Debug/net8.0-windows
 
+VoiceToKeyboard/bin/Debug/net8.0-windows/runtimes/win/lib/net8.0/System.Speech.dll
+VoiceToKeyboard/bin/Debug/net8.0-windows/System.Speech.dll
+VoiceToKeyboard/bin/Debug/net8.0-windows/VoiceToKeyboard.deps.json
+VoiceToKeyboard/bin/Debug/net8.0-windows/VoiceToKeyboard.dll
+VoiceToKeyboard/bin/Debug/net8.0-windows/VoiceToKeyboard.exe
+VoiceToKeyboard/bin/Debug/net8.0-windows/VoiceToKeyboard.pdb
+VoiceToKeyboard/obj/Debug/net8.0-windows/apphost.exe
+VoiceToKeyboard/obj/Debug/net8.0-windows/ref/VoiceToKeyboard.dll
+VoiceToKeyboard/obj/Debug/net8.0-windows/refint/VoiceToKeyboard.dll
+VoiceToKeyboard/obj/Debug/net8.0-windows/VoiceToKeyboard.AssemblyInfo.cs
+VoiceToKeyboard/obj/Debug/net8.0-windows/VoiceToKeyboard.AssemblyInfoInputs.cache
+VoiceToKeyboard/obj/Debug/net8.0-windows/VoiceToKeyboard.assets.cache
+VoiceToKeyboard/obj/Debug/net8.0-windows/VoiceToKeyboard.csproj.FileListAbsolute.txt
+VoiceToKeyboard/obj/Debug/net8.0-windows/VoiceToKeyboard.dll
+VoiceToKeyboard/obj/Debug/net8.0-windows/VoiceToKeyboard.GeneratedMSBuildEditorConfig.editorconfig
+VoiceToKeyboard/obj/Debug/net8.0-windows/VoiceToKeyboard.pdb
+VoiceToKeyboard/obj/Debug/net8.0-windows/VoiceToKeyboard.sourcelink.json
