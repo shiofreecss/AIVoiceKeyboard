@@ -1,62 +1,57 @@
-# AI Voice to Keyboard Converter - Version History
+# AI Voice Keyboard - Version History
 
-## v1.0.2 (Current)
+## v1.0.2 (Current) - 2025-03-30
 
-### Improvements
+### Version Configuration System
 - Added version.cfg file to manage application version information
+- Added floating overlay button for easy access
 - Application now reads version, build number, and release date from external configuration
 - Improved About dialog shows detailed version and build information
-- Enhanced icon handling with proper fallback mechanisms
-- Added custom application icon in both ICO and PNG formats
 - Simplified version management for future updates
 
-### Technical Improvements
-- Icon files are now properly included in the build process
-- Version configuration is automatically copied to the output directory
-- Added robust error handling for version reading and icon loading
-
-## v1.0.1
-
-### Improvements
-- Added automatic pause after 1.5 seconds of silence in String Mode
-- Enhanced noise filtering to remove various sound effect annotations:
-  - Asterisk-enclosed noise like *cough*, *sad music*
-  - Curly brace annotations like {sound effects}
-  - Hash-surrounded noise like #background noise#
-  - Tilde-enclosed items like ~background noise~
-- Added filtering for common sound effect words (cough, sigh, laugh, music, etc.)
-- Improved text cleanup after noise removal:
-  - Better capitalization handling
-  - Proper spacing around punctuation
-  - Fixed standalone "i" to "I"
-  - Balanced delimiters for quotes and parentheses
-- Updated UI to reflect automatic silence detection
-
 ### Bug Fixes
-- Fixed processing of longer audio segments with appropriate timeouts
-- Improved sentence handling with proper punctuation
+- Fixed occasional Whisper model initialization issues
+- Improved error handling for audio capture failures
+- Fixed threading issues that could cause UI freezes
+- Enhanced recovery from recognition errors
 
-## v1.0.0 (Initial Release)
+## v1.0.1 - 2025-03-15
 
-### New Features
-- **Real-time Word Recognition**: Added real-time word-by-word processing for more responsive dictation
-- **Improved Audio Capture**: Reduced audio capture time from 5s to 2.5s for faster recognition
-- **Visual Speaking Indicator**: Added green "SPEAKING NOW - PLEASE TALK" indicator with flashing effect
-- **Scrollable Text Display**: Replaced static label with scrollable text box for unlimited text length
-- **Copy Functionality**: Added "Copy Text" button and right-click context menu with copy options
-- **Noise Filtering**: Automatically removes noise annotations like (keyboard tapping), [buzzer], etc.
-- **UI Improvements**: Updated color scheme and indicators for better visual feedback
+### Enhanced Noise Filtering
+- Comprehensive filtering of noise annotations in various formats:
+  - Asterisk-enclosed noise like *cough*, *sad music*
+  - Parentheses, brackets, curly braces, and other delimiters
+  - Common sound effect words with surrounding punctuation
+- Intelligent text cleanup with proper capitalization and punctuation
+- Better handling of sentences with balanced delimiters
 
-### Core Features
-- Converts voice commands to keyboard inputs
-- Two recognition modes:
-  - Command Mode: Execute keyboard commands and shortcuts
-  - String Mode: Type spoken text directly with real-time word detection
-- Support for basic navigation keys (arrows, enter, space, etc.)
-- Support for function keys (F1-F12)
-- Support for keyboard shortcuts (Ctrl+C, Ctrl+V, Alt+Tab, etc.)
-- Advanced speech recognition using OpenAI's Whisper (offline, local processing)
-- Visual speaking indicator that shows when to talk in String Mode
-- Scrollable text display with copy functionality
-- Basic noise annotation filtering
-- Real-time status updates
+### Automatic Speech Pause Detection
+- Recording automatically stops after 1.5 seconds of silence
+- No need to manually stop recording between phrases
+- More natural speech flow with automatic pausing
+- Visual indicator shows "WILL PAUSE AFTER 1.5s SILENCE"
+
+### Improved Text Processing
+- Better sentence handling with proper punctuation
+- Fixed standalone "i" to proper "I" capitalization
+- Appropriate spacing around punctuation marks
+- Balanced delimiters for quotes and parentheses
+
+### UI Improvements
+- Cleaner status updates with color-coded messages
+- Improved visual feedback during recording
+- Enhanced error messaging with troubleshooting guidance
+
+## v1.0.0 - 2025-03-01
+
+### Initial Release
+- Two recognition modes: Command Mode and String Mode
+- AI-powered speech recognition using Whisper
+- Windows Speech Recognition as fallback
+- Real-time word-by-word recognition
+- Visual speaking indicator
+- Scrollable text display
+- Copy and clear functionality
+- Noise filtering
+- Floating overlay option
+- System tray integration

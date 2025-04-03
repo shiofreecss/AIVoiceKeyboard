@@ -14,12 +14,323 @@ using System.Drawing.Imaging;
 
 namespace VoiceToKeyboard;
 
+// Floating overlay form that stays on top of other windows
+public class OverlayForm : Form
+{
+    private Button recordButton;
+    private Button closeButton;
+    private Form1 parentForm;
+    private bool isDragging = false;
+    private Point dragStartPoint;
+    private NotifyIcon? notifyIcon;
+    private Label modeIndicator;
+
+    // P/Invoke for setting window to be click-through when needed
+    [DllImport("user32.dll")]
+    private static extern int SetWindowLong(IntPtr hWnd, int nIndex, int dwNewLong);
+    
+    [DllImport("user32.dll")]
+    private static extern int GetWindowLong(IntPtr hWnd, int nIndex);
+    
+    private const int GWL_EXSTYLE = -20;
+    private const int WS_EX_LAYERED = 0x80000;
+    private const int WS_EX_TRANSPARENT = 0x20;
+    
+    public OverlayForm(Form1 parent)
+    {
+        parentForm = parent;
+        
+        // Basic form settings
+        this.FormBorderStyle = FormBorderStyle.None;
+        this.ShowInTaskbar = false;
+        this.TopMost = true;
+        this.BackColor = Color.FromArgb(31, 34, 52); // Match app theme
+        this.Size = new Size(60, 90); // Fixed height
+        this.StartPosition = FormStartPosition.Manual;
+        this.Opacity = 0.9; // Less transparent for better visibility
+        
+        // Position it at the right side of the screen
+        Rectangle screen = Screen.PrimaryScreen.WorkingArea;
+        this.Location = new Point(screen.Width - this.Width - 20, screen.Height / 2 - this.Height / 2);
+        
+        // Create the record button
+        recordButton = new Button();
+        recordButton.Size = new Size(50, 50);
+        recordButton.Location = new Point(5, 5);
+        recordButton.FlatStyle = FlatStyle.Flat;
+        recordButton.FlatAppearance.BorderSize = 0;
+        recordButton.BackColor = Color.Gray; // Default to gray (not recording)
+        recordButton.ForeColor = Color.White;
+        recordButton.Text = "●";
+        recordButton.Font = new Font("Arial", 16, FontStyle.Bold);
+        recordButton.Click += RecordButton_Click;
+        this.Controls.Add(recordButton);
+        
+        // Create mode indicator label
+        modeIndicator = new Label();
+        modeIndicator.Size = new Size(50, 25);
+        modeIndicator.Location = new Point(5, 60);
+        modeIndicator.BackColor = Color.FromArgb(41, 44, 62);
+        modeIndicator.ForeColor = Color.White;
+        modeIndicator.Text = "CMD";
+        modeIndicator.TextAlign = ContentAlignment.MiddleCenter;
+        modeIndicator.Font = new Font("Arial", 8, FontStyle.Bold);
+        modeIndicator.Cursor = Cursors.Hand;
+        modeIndicator.Click += ModeIndicator_Click;
+        this.Controls.Add(modeIndicator);
+        
+        // Create a small close button (X) in top-right corner
+        closeButton = new Button();
+        closeButton.Size = new Size(20, 20);
+        closeButton.Location = new Point(this.Width - 25, 5);
+        closeButton.FlatStyle = FlatStyle.Flat;
+        closeButton.FlatAppearance.BorderSize = 0;
+        closeButton.BackColor = Color.FromArgb(192, 0, 0); // Red for close button
+        closeButton.ForeColor = Color.White;
+        closeButton.Text = "×";
+        closeButton.Font = new Font("Arial", 12, FontStyle.Bold);
+        closeButton.TextAlign = ContentAlignment.TopCenter;
+        closeButton.Cursor = Cursors.Hand;
+        closeButton.Click += CloseButton_Click;
+        this.Controls.Add(closeButton);
+        
+        // Make the form shape rounded rectangular with smoother corners
+        GraphicsPath path = new GraphicsPath();
+        int radius = 15; // Corner radius
+        
+        // Add rounded rectangle for main form
+        path.AddArc(0, 0, radius * 2, radius * 2, 180, 90); // Top-left corner
+        path.AddArc(this.Width - radius * 2, 0, radius * 2, radius * 2, 270, 90); // Top-right corner
+        path.AddArc(this.Width - radius * 2, this.Height - radius * 2, radius * 2, radius * 2, 0, 90); // Bottom-right corner
+        path.AddArc(0, this.Height - radius * 2, radius * 2, radius * 2, 90, 90); // Bottom-left corner
+        path.CloseAllFigures();
+        
+        this.Region = new Region(path);
+        
+        // Make the close button visible on top of the rounded region
+        closeButton.BringToFront();
+        
+        // Mouse events for dragging
+        this.MouseDown += OverlayForm_MouseDown;
+        this.MouseMove += OverlayForm_MouseMove;
+        this.MouseUp += OverlayForm_MouseUp;
+        recordButton.MouseDown += OverlayForm_MouseDown;
+        recordButton.MouseMove += OverlayForm_MouseMove;
+        recordButton.MouseUp += OverlayForm_MouseUp;
+        
+        // Create context menu for right-click on the button
+        ContextMenuStrip contextMenu = new ContextMenuStrip();
+        
+        // Add menu items
+        ToolStripMenuItem commandModeItem = new ToolStripMenuItem("Command Mode");
+        commandModeItem.Click += (s, e) => parentForm.SwitchModeFromOverlay(Form1.InputMode.Command);
+        contextMenu.Items.Add(commandModeItem);
+        
+        ToolStripMenuItem stringModeItem = new ToolStripMenuItem("String Mode");
+        stringModeItem.Click += (s, e) => parentForm.SwitchModeFromOverlay(Form1.InputMode.String);
+        contextMenu.Items.Add(stringModeItem);
+        
+        contextMenu.Items.Add(new ToolStripSeparator());
+        
+        ToolStripMenuItem openMainItem = new ToolStripMenuItem("Open Main Window");
+        openMainItem.Click += (s, e) => parentForm.ShowMainWindow();
+        contextMenu.Items.Add(openMainItem);
+        
+        ToolStripMenuItem exitItem = new ToolStripMenuItem("Exit Application");
+        exitItem.Click += (s, e) => parentForm.ExitApplication();
+        contextMenu.Items.Add(exitItem);
+        
+        this.ContextMenuStrip = contextMenu;
+        recordButton.ContextMenuStrip = contextMenu;
+        modeIndicator.ContextMenuStrip = contextMenu;
+        
+        // Add notifyIcon for tray access
+        notifyIcon = new NotifyIcon();
+        notifyIcon.Text = "AI Voice Keyboard";
+        try
+        {
+            string iconPath = Path.Combine(Application.StartupPath, "icon", "ai-voice-keyboard.ico");
+            if (File.Exists(iconPath))
+            {
+                notifyIcon.Icon = new Icon(iconPath);
+            }
+            else
+            {
+                iconPath = Path.Combine("icon", "ai-voice-keyboard.ico");
+                if (File.Exists(iconPath))
+                {
+                    notifyIcon.Icon = new Icon(iconPath);
+                }
+                else
+                {
+                    notifyIcon.Icon = SystemIcons.Application;
+                }
+            }
+        }
+        catch
+        {
+            notifyIcon.Icon = SystemIcons.Application;
+        }
+        notifyIcon.Visible = true;
+        notifyIcon.ContextMenuStrip = contextMenu;
+        notifyIcon.DoubleClick += (s, e) => parentForm.ShowMainWindow();
+    }
+    
+    // Handler for the close button
+    private void CloseButton_Click(object sender, EventArgs e)
+    {
+        // Hide overlay instead of exiting the application
+        parentForm.HideOverlayAndUntickCheckbox();
+    }
+    
+    // Override CreateParams to ensure the overlay stays on top across desktops
+    protected override CreateParams CreateParams
+    {
+        get
+        {
+            var cp = base.CreateParams;
+            // Add the always-on-top style
+            cp.ExStyle |= 0x00000008; // WS_EX_TOPMOST
+            // Add the tool window style to reduce taskbar presence
+            cp.ExStyle |= 0x00000080; // WS_EX_TOOLWINDOW
+            return cp;
+        }
+    }
+    
+    // Mode indicator click event handler
+    private void ModeIndicator_Click(object sender, EventArgs e)
+    {
+        // Toggle between Command and String modes
+        if (modeIndicator.Text == "CMD")
+        {
+            parentForm.SwitchModeFromOverlay(Form1.InputMode.String);
+        }
+        else
+        {
+            parentForm.SwitchModeFromOverlay(Form1.InputMode.Command);
+        }
+    }
+    
+    // Update button appearance based on recording state and current mode
+    public void UpdateButtonState(bool isRecording, Form1.InputMode currentMode)
+    {
+        // Use BeginInvoke to ensure we're on the UI thread
+        if (this.IsHandleCreated && !this.IsDisposed)
+        {
+            this.BeginInvoke((MethodInvoker)delegate
+            {
+                // Update recording button
+                if (isRecording)
+                {
+                    recordButton.BackColor = Color.Red;
+                    recordButton.Text = "■";
+                    
+                    if (notifyIcon != null)
+                        notifyIcon.Text = $"AI Voice Keyboard ({currentMode} Mode - Recording)";
+                }
+                else
+                {
+                    recordButton.BackColor = Color.Gray;
+                    recordButton.Text = "●";
+                    
+                    if (notifyIcon != null)
+                        notifyIcon.Text = $"AI Voice Keyboard ({currentMode} Mode - Not Recording)";
+                }
+                
+                // Update mode indicator
+                if (currentMode == Form1.InputMode.Command)
+                {
+                    modeIndicator.Text = "CMD";
+                    modeIndicator.BackColor = Color.FromArgb(41, 44, 62);
+                }
+                else
+                {
+                    modeIndicator.Text = "STR";
+                    modeIndicator.BackColor = Color.FromArgb(84, 130, 210); // Bitwarden blue
+                }
+            });
+        }
+    }
+    
+    private void RecordButton_Click(object sender, EventArgs e)
+    {
+        // Toggle recording state in parent form
+        parentForm.ToggleRecordingFromOverlay();
+    }
+    
+    // Handle dragging of the overlay
+    private void OverlayForm_MouseDown(object sender, MouseEventArgs e)
+    {
+        if (e.Button == MouseButtons.Left)
+        {
+            isDragging = true;
+            dragStartPoint = new Point(e.X, e.Y);
+        }
+    }
+    
+    private void OverlayForm_MouseMove(object sender, MouseEventArgs e)
+    {
+        if (isDragging)
+        {
+            Point currentPoint = PointToScreen(new Point(e.X, e.Y));
+            this.Location = new Point(
+                currentPoint.X - dragStartPoint.X,
+                currentPoint.Y - dragStartPoint.Y
+            );
+        }
+    }
+    
+    private void OverlayForm_MouseUp(object sender, MouseEventArgs e)
+    {
+        isDragging = false;
+    }
+    
+    // Make form click-through when needed
+    public void SetClickThrough(bool clickThrough)
+    {
+        if (this.IsHandleCreated && !this.IsDisposed)
+        {
+            try
+            {
+                if (clickThrough)
+                {
+                    int exStyle = GetWindowLong(this.Handle, GWL_EXSTYLE);
+                    SetWindowLong(this.Handle, GWL_EXSTYLE, exStyle | WS_EX_LAYERED | WS_EX_TRANSPARENT);
+                }
+                else
+                {
+                    int exStyle = GetWindowLong(this.Handle, GWL_EXSTYLE);
+                    SetWindowLong(this.Handle, GWL_EXSTYLE, exStyle & ~(WS_EX_LAYERED | WS_EX_TRANSPARENT));
+                }
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Error setting click-through: {ex.Message}");
+            }
+        }
+    }
+    
+    // Clean up notifyIcon when the form is closing
+    protected override void Dispose(bool disposing)
+    {
+        if (disposing)
+        {
+            if (notifyIcon != null)
+            {
+                notifyIcon.Dispose();
+                notifyIcon = null;
+            }
+        }
+        base.Dispose(disposing);
+    }
+}
+
 public partial class Form1 : Form
 {
     private SpeechRecognitionEngine? commandRecognizer;
     private SpeechRecognitionEngine? dictationRecognizer;
     private bool isListening = false;
-    private enum InputMode { Command, String }
+    public enum InputMode { Command, String }
     private InputMode currentMode = InputMode.Command;
     private StringBuilder typedText = new StringBuilder();
     private Label? modeIndicatorLabel;
@@ -179,6 +490,13 @@ public partial class Form1 : Form
         { "close", 0x57 },          // W (for Ctrl+W)
     };
 
+    private OverlayForm? overlayForm;
+    private bool overlayEnabled = false;
+    private CheckBox? enableOverlayCheckBox;
+    
+    // Add flag to track if we've shown the main window
+    private bool mainWindowShown = true;
+
     public Form1()
     {
         InitializeComponent();
@@ -192,6 +510,9 @@ public partial class Form1 : Form
         
         // Add form load event handler to initialize Whisper after the window handle is created
         this.Load += Form1_Load;
+        
+        // Add event handler for form resize to handle minimizing
+        this.Resize += Form1_Resize;
     }
 
     private void LoadVersionInfo()
@@ -914,7 +1235,7 @@ public partial class Form1 : Form
         };
         leftPanel.Controls.Add(clearTextButton);
         
-        // Add a copy text button
+        /* Add a copy text button
         Button copyTextButton = new Button
         {
             Text = "Copy Text",
@@ -924,7 +1245,8 @@ public partial class Form1 : Form
             BackColor = System.Drawing.Color.FromArgb(41, 44, 62), // Darker button
             ForeColor = System.Drawing.Color.White,
             Font = new System.Drawing.Font("Segoe UI", 10F, System.Drawing.FontStyle.Regular),
-            Cursor = Cursors.Hand
+            Cursor = Cursors.Hand,
+            Visible = false // Hide the Copy Text button
         };
         copyTextButton.FlatAppearance.BorderColor = System.Drawing.Color.FromArgb(51, 54, 72);
         
@@ -937,13 +1259,14 @@ public partial class Form1 : Form
             }
         };
         leftPanel.Controls.Add(copyTextButton);
-        
+        */
+
         // Add settings panel for speech recognition
         GroupBox settingsGroupBox = new GroupBox
         {
             Text = "Recognition Settings",
-            Location = new System.Drawing.Point(15, 215 + 45), // Adjust position for new copy button
-            Size = new System.Drawing.Size(190, 75),
+            Location = new System.Drawing.Point(15, 215), // Adjust position for new copy button
+            Size = new System.Drawing.Size(190, 125), // Increase height to accommodate overlay checkbox
             Font = new System.Drawing.Font("Segoe UI", 9F, System.Drawing.FontStyle.Regular),
             ForeColor = System.Drawing.Color.White,
             BackColor = System.Drawing.Color.FromArgb(31, 34, 52) // Dark background like Bitwarden
@@ -1001,6 +1324,20 @@ public partial class Form1 : Form
         settingsGroupBox.Controls.Add(resetModelButton);
         
         leftPanel.Controls.Add(settingsGroupBox);
+        
+        // Create a checkbox for enabling the overlay
+        enableOverlayCheckBox = new CheckBox
+        {
+            Text = "Enable floating button",
+            AutoSize = true,
+            Location = new Point(15, 75),
+            Font = new System.Drawing.Font("Segoe UI", 9F, System.Drawing.FontStyle.Regular),
+            ForeColor = System.Drawing.Color.White,
+            BackColor = System.Drawing.Color.FromArgb(31, 34, 52),
+            Cursor = Cursors.Hand
+        };
+        enableOverlayCheckBox.CheckedChanged += EnableOverlayCheckBox_CheckedChanged;
+        settingsGroupBox.Controls.Add(enableOverlayCheckBox);
         
         // Status panel
         Panel statusPanel = new Panel
@@ -1486,6 +1823,12 @@ public partial class Form1 : Form
             }
         }
         
+        // Update the overlay to show the current mode
+        if (overlayForm != null && !overlayForm.IsDisposed && overlayEnabled)
+        {
+            overlayForm.UpdateButtonState(isListening, mode);
+        }
+        
         if (isListening)
         {
             StartListening();
@@ -1524,7 +1867,7 @@ public partial class Form1 : Form
             if (currentMode == InputMode.Command && commandRecognizer != null)
             {
                 commandRecognizer.RecognizeAsync(RecognizeMode.Multiple);
-                UpdateRecordingStatus(false); // Command mode doesn't show continuous recording
+                UpdateRecordingStatus(true); // Show recording status for both modes
             }
             else if (currentMode == InputMode.String)
             {
@@ -1711,6 +2054,19 @@ public partial class Form1 : Form
                     flashTimer.Stop();
                 }
             }
+            
+            // Also update overlay if available and not disposed
+            try
+            {
+                if (overlayForm != null && !overlayForm.IsDisposed && overlayEnabled)
+                {
+                    overlayForm.UpdateButtonState(isRecording, currentMode);
+                }
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Error updating overlay: {ex.Message}");
+            }
         });
     }
 
@@ -1741,19 +2097,64 @@ public partial class Form1 : Form
     // Clean up resources
     protected override void OnFormClosing(FormClosingEventArgs e)
     {
-        base.OnFormClosing(e);
-        
-        // Clean up resources
-        whisperRecognition?.Dispose();
-        audioCapture?.Dispose();
-        cancellationTokenSource?.Dispose();
-        
-        // Clean up the flash timer
-        if (flashTimer != null)
+        // If overlay is enabled and user is trying to close with the X button
+        if (overlayEnabled && e.CloseReason == CloseReason.UserClosing)
         {
-            flashTimer.Stop();
-            flashTimer.Dispose();
-            flashTimer = null;
+            // Cancel the close
+            e.Cancel = true;
+            
+            // Hide the form instead
+            this.Hide();
+            mainWindowShown = false;
+            
+            // Show notification to the user
+            if (overlayForm != null && !overlayForm.IsDisposed)
+            {
+                UpdateStatusLabel("Main window hidden. Use the floating button to control recording.");
+            }
+        }
+        else
+        {
+            // Perform normal closing operations
+            // Stop listening if active
+            if (isListening)
+            {
+                StopListening();
+            }
+            
+            // Cleanup resources
+            commandRecognizer?.Dispose();
+            dictationRecognizer?.Dispose();
+            cancellationTokenSource?.Cancel();
+            
+            // Stop flash timer if running
+            if (flashTimer != null)
+            {
+                flashTimer.Stop();
+                flashTimer.Dispose();
+                flashTimer = null;
+            }
+            
+            // Clean up overlay
+            try
+            {
+                if (overlayForm != null)
+                {
+                    if (!overlayForm.IsDisposed)
+                    {
+                        overlayForm.Hide();
+                        overlayForm.Close();
+                    }
+                    overlayForm.Dispose();
+                    overlayForm = null;
+                }
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Error disposing overlay: {ex.Message}");
+            }
+            
+            base.OnFormClosing(e);
         }
     }
 
@@ -1989,6 +2390,219 @@ public partial class Form1 : Form
             this.Controls.Add(licenseLabel);
             this.Controls.Add(licenseLinkLabel);
             this.Controls.Add(okButton);
+        }
+    }
+
+    private void EnableOverlayCheckBox_CheckedChanged(object? sender, EventArgs e)
+    {
+        if (enableOverlayCheckBox == null) return;
+        
+        overlayEnabled = enableOverlayCheckBox.Checked;
+        
+        try
+        {
+            if (overlayEnabled)
+            {
+                ShowOverlay();
+                
+                // Add notification to user about minimizing
+                UpdateStatusLabel("You can now minimize or close the main window. The floating button will remain.");
+            }
+            else
+            {
+                HideOverlay();
+                
+                // Show the main window if it was hidden
+                ShowMainWindow();
+            }
+        }
+        catch (Exception ex)
+        {
+            UpdateStatusLabel($"Overlay error: {ex.Message}");
+        }
+    }
+    
+    private void ShowOverlay()
+    {
+        try
+        {
+            // Dispose old overlay if it exists
+            if (overlayForm != null)
+            {
+                if (!overlayForm.IsDisposed)
+                {
+                    overlayForm.Hide();
+                    overlayForm.Close();
+                }
+                overlayForm = null;
+            }
+            
+            // Create a new overlay form
+            overlayForm = new OverlayForm(this);
+            overlayForm.UpdateButtonState(isListening, currentMode);
+            
+            // Show the form without setting this as owner to prevent minimizing with main window
+            overlayForm.Show();
+            
+            // Ensure it's on top
+            overlayForm.TopMost = true;
+            overlayForm.BringToFront();
+        }
+        catch (Exception ex)
+        {
+            UpdateStatusLabel($"Error showing overlay: {ex.Message}");
+        }
+    }
+    
+    private void HideOverlay()
+    {
+        try
+        {
+            if (overlayForm != null)
+            {
+                if (!overlayForm.IsDisposed)
+                {
+                    overlayForm.Hide();
+                    overlayForm.Close();
+                }
+                overlayForm = null;
+            }
+        }
+        catch (Exception ex)
+        {
+            UpdateStatusLabel($"Error hiding overlay: {ex.Message}");
+        }
+    }
+    
+    public void ToggleRecordingFromOverlay()
+    {
+        try
+        {
+            // Find the toggle button in the controls
+            Button? toggleButton = null;
+            foreach (Control control in this.Controls)
+            {
+                if (control is Panel mainPanel)
+                {
+                    foreach (Control panelControl in mainPanel.Controls)
+                    {
+                        if (panelControl is Panel leftPanel)
+                        {
+                            foreach (Control leftControl in leftPanel.Controls)
+                            {
+                                if (leftControl is Button button && 
+                                    (button.Text == "Start Listening" || button.Text == "Stop Listening"))
+                                {
+                                    toggleButton = button;
+                                    break;
+                                }
+                            }
+                        }
+                        if (toggleButton != null) break;
+                    }
+                }
+                if (toggleButton != null) break;
+            }
+            
+            // Toggle the recording state using the found button or directly
+            if (toggleButton != null && this.IsHandleCreated && !this.IsDisposed)
+            {
+                // Use BeginInvoke to safely invoke from another thread if needed
+                this.BeginInvoke(new Action(() => ToggleRecognition(toggleButton)));
+            }
+            else
+            {
+                // Fallback to direct toggling if button not found
+                if (isListening)
+                {
+                    StopListening();
+                    isListening = false;
+                    UpdateStatusLabel("Status: Not Listening");
+                }
+                else
+                {
+                    StartListening();
+                    UpdateStatusLabel($"Listening in {currentMode} mode...");
+                }
+                
+                // Update overlay button appearance manually
+                if (overlayForm != null && !overlayForm.IsDisposed)
+                {
+                    overlayForm.UpdateButtonState(isListening, currentMode);
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            UpdateStatusLabel($"Error toggling recording: {ex.Message}");
+        }
+    }
+    
+    private void Form1_Resize(object sender, EventArgs e)
+    {
+        // When minimized and overlay is enabled, hide the window instead of minimizing
+        if (this.WindowState == FormWindowState.Minimized && overlayEnabled)
+        {
+            this.Hide();
+            mainWindowShown = false;
+            
+            // Make sure overlay is visible and properly displayed
+            if (overlayForm != null && !overlayForm.IsDisposed)
+            {
+                // Reset owner to null to prevent overlay from minimizing with main form
+                overlayForm.Owner = null;
+                
+                // Ensure it's visible and on top
+                if (!overlayForm.Visible)
+                {
+                    overlayForm.Show();
+                }
+                overlayForm.TopMost = true;
+                overlayForm.BringToFront();
+                
+                // Ensure the system knows the form is still active
+                overlayForm.Update();
+            }
+        }
+    }
+    
+    // Method to show the main window
+    public void ShowMainWindow()
+    {
+        if (!mainWindowShown)
+        {
+            this.Show();
+            this.WindowState = FormWindowState.Normal;
+            this.BringToFront();
+            mainWindowShown = true;
+        }
+    }
+    
+    // Add a proper exit method to truly close the application
+    public void ExitApplication()
+    {
+        // Set a flag to truly close
+        overlayEnabled = false;
+        
+        // Use Application.Exit to close all forms
+        Application.Exit();
+    }
+
+    public void SwitchModeFromOverlay(InputMode mode)
+    {
+        SwitchMode(mode);
+    }
+
+    public void HideOverlayAndUntickCheckbox()
+    {
+        // Hide the overlay
+        HideOverlay();
+        
+        // Untick the checkbox if it exists
+        if (enableOverlayCheckBox != null && enableOverlayCheckBox.Checked)
+        {
+            enableOverlayCheckBox.Checked = false;
+            overlayEnabled = false;
         }
     }
 }
