@@ -24,6 +24,7 @@ public class OverlayForm : Form
     private Point dragStartPoint;
     private NotifyIcon? notifyIcon;
     private Label modeIndicator;
+    private Panel dragHandle; // Add a drag handle panel
 
     // P/Invoke for setting window to be click-through when needed
     [DllImport("user32.dll")]
@@ -45,7 +46,7 @@ public class OverlayForm : Form
         this.ShowInTaskbar = false;
         this.TopMost = true;
         this.BackColor = Color.FromArgb(31, 34, 52); // Match app theme
-        this.Size = new Size(60, 90); // Fixed height
+        this.Size = new Size(60, 100); // Increase height to accommodate drag handle
         this.StartPosition = FormStartPosition.Manual;
         this.Opacity = 0.9; // Less transparent for better visibility
         
@@ -53,10 +54,18 @@ public class OverlayForm : Form
         Rectangle screen = Screen.PrimaryScreen.WorkingArea;
         this.Location = new Point(screen.Width - this.Width - 20, screen.Height / 2 - this.Height / 2);
         
-        // Create the record button
+        // Create the drag handle
+        dragHandle = new Panel();
+        dragHandle.Size = new Size(50, 8);
+        dragHandle.Location = new Point(5, 0);
+        dragHandle.BackColor = Color.FromArgb(51, 54, 72); // More subtle dark gray instead of blue
+        dragHandle.Cursor = Cursors.SizeAll;
+        this.Controls.Add(dragHandle);
+        
+        // Create the record button (adjust location for drag handle)
         recordButton = new Button();
         recordButton.Size = new Size(50, 50);
-        recordButton.Location = new Point(5, 5);
+        recordButton.Location = new Point(5, 10); // Move down to accommodate drag handle
         recordButton.FlatStyle = FlatStyle.Flat;
         recordButton.FlatAppearance.BorderSize = 0;
         recordButton.BackColor = Color.Gray; // Default to gray (not recording)
@@ -66,10 +75,10 @@ public class OverlayForm : Form
         recordButton.Click += RecordButton_Click;
         this.Controls.Add(recordButton);
         
-        // Create mode indicator label
+        // Create mode indicator label (adjust location)
         modeIndicator = new Label();
         modeIndicator.Size = new Size(50, 25);
-        modeIndicator.Location = new Point(5, 60);
+        modeIndicator.Location = new Point(5, 65); // Adjust for drag handle
         modeIndicator.BackColor = Color.FromArgb(41, 44, 62);
         modeIndicator.ForeColor = Color.White;
         modeIndicator.Text = "CMD";
@@ -81,15 +90,15 @@ public class OverlayForm : Form
         
         // Create a small close button (X) in top-right corner
         closeButton = new Button();
-        closeButton.Size = new Size(20, 20);
-        closeButton.Location = new Point(this.Width - 25, 5);
+        closeButton.Size = new Size(18, 18);
+        closeButton.Location = new Point(this.Width - 21, 0); // Reposition to top-right corner
         closeButton.FlatStyle = FlatStyle.Flat;
         closeButton.FlatAppearance.BorderSize = 0;
         closeButton.BackColor = Color.FromArgb(192, 0, 0); // Red for close button
         closeButton.ForeColor = Color.White;
         closeButton.Text = "×";
-        closeButton.Font = new Font("Arial", 12, FontStyle.Bold);
-        closeButton.TextAlign = ContentAlignment.TopCenter;
+        closeButton.Font = new Font("Arial", 10, FontStyle.Bold);
+        closeButton.TextAlign = ContentAlignment.MiddleCenter;
         closeButton.Cursor = Cursors.Hand;
         closeButton.Click += CloseButton_Click;
         this.Controls.Add(closeButton);
@@ -107,10 +116,20 @@ public class OverlayForm : Form
         
         this.Region = new Region(path);
         
-        // Make the close button visible on top of the rounded region
+        // Bring controls to front to ensure visibility with rounded corners
+        dragHandle.BringToFront();
         closeButton.BringToFront();
         
-        // Mouse events for dragging
+        // Add drag handle specific mouse events
+        dragHandle.MouseDown += DragHandle_MouseDown;
+        dragHandle.MouseMove += DragHandle_MouseMove;
+        dragHandle.MouseUp += DragHandle_MouseUp;
+        
+        // Modify tooltip for dragHandle to make it clear that this is for dragging
+        ToolTip dragTooltip = new ToolTip();
+        dragTooltip.SetToolTip(dragHandle, "Drag to move");
+        
+        // Mouse events for dragging (keep existing events)
         this.MouseDown += OverlayForm_MouseDown;
         this.MouseMove += OverlayForm_MouseMove;
         this.MouseUp += OverlayForm_MouseUp;
@@ -322,6 +341,40 @@ public class OverlayForm : Form
             }
         }
         base.Dispose(disposing);
+    }
+
+    // Mouse event handlers specifically for the drag handle
+    private void DragHandle_MouseDown(object sender, MouseEventArgs e)
+    {
+        if (e.Button == MouseButtons.Left)
+        {
+            isDragging = true;
+            
+            // Convert drag handle coordinates to form coordinates
+            Point controlPoint = dragHandle.PointToScreen(new Point(e.X, e.Y));
+            dragStartPoint = this.PointToClient(controlPoint);
+        }
+    }
+    
+    private void DragHandle_MouseMove(object sender, MouseEventArgs e)
+    {
+        if (isDragging)
+        {
+            // Convert the current coordinates to screen coordinates
+            Point controlPoint = dragHandle.PointToScreen(new Point(e.X, e.Y));
+            Point formPoint = this.PointToClient(controlPoint);
+            
+            // Move the form
+            this.Location = new Point(
+                this.Location.X + (formPoint.X - dragStartPoint.X),
+                this.Location.Y + (formPoint.Y - dragStartPoint.Y)
+            );
+        }
+    }
+    
+    private void DragHandle_MouseUp(object sender, MouseEventArgs e)
+    {
+        isDragging = false;
     }
 }
 
