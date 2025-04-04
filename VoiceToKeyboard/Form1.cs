@@ -636,6 +636,14 @@ public partial class Form1 : Form
                 if (this.IsHandleCreated)
                 {
                     UpdateStatusLabel(status);
+                    
+                    // If status indicates model is missing, show the download button
+                    if (status.Contains("not found", StringComparison.OrdinalIgnoreCase) ||
+                        status.Contains("model file not found", StringComparison.OrdinalIgnoreCase) ||
+                        status.Contains("download", StringComparison.OrdinalIgnoreCase))
+                    {
+                        ShowDownloadButton(true);
+                    }
                 }
             };
             
@@ -657,9 +665,31 @@ public partial class Form1 : Form
             };
             
             // Initialize Whisper (this will download the model if needed)
-            UpdateStatusLabel($"Loading medium model for best stability...");
-            whisperRecognition.InitializeAsync().Wait();
-            isWhisperReady = true;
+            try
+            {
+                UpdateStatusLabel($"Loading medium model for best stability...");
+                whisperRecognition.InitializeAsync().Wait();
+                isWhisperReady = true;
+                
+                // Hide download button and update Whisper label since model is available
+                ShowDownloadButton(false);
+            }
+            catch (AggregateException ex)
+            {
+                // Check if the error is due to model not found
+                if (ex.InnerException != null && 
+                    (ex.InnerException.Message.Contains("not found") || 
+                     ex.InnerException.Message.Contains("file not found")))
+                {
+                    isWhisperReady = false;
+                    UpdateStatusLabel($"Whisper model not found: {ex.InnerException.Message}");
+                    ShowDownloadButton(true);
+                }
+                else
+                {
+                    throw; // Rethrow for handling in outer catch block
+                }
+            }
             
             // Update the label when ready
             if (this.IsHandleCreated)
@@ -673,7 +703,10 @@ public partial class Form1 : Form
                 });
             }
             
-            UpdateStatusLabel("Whisper ready with medium model - start listening");
+            if (isWhisperReady)
+            {
+                UpdateStatusLabel("Whisper ready with medium model - start listening");
+            }
         }
         catch (AggregateException ex)
         {
@@ -682,11 +715,133 @@ public partial class Form1 : Form
             // Get inner exception if available (more detailed)
             Exception detailedException = ex.InnerException ?? ex;
             UpdateStatusLabel($"Whisper initialization error: {detailedException.Message}");
+            
+            // Show download button in case of initialization failure
+            ShowDownloadButton(true);
         }
         catch (Exception ex)
         {
             isWhisperReady = false;
             UpdateStatusLabel($"Whisper initialization error: {ex.Message}");
+            
+            // Show download button in case of initialization failure
+            ShowDownloadButton(true);
+        }
+    }
+    
+    // Helper method to show or hide the download button
+    private void ShowDownloadButton(bool show)
+    {
+        if (this.IsHandleCreated)
+        {
+            this.Invoke((MethodInvoker)delegate
+            {
+                if (resetModelButton != null)
+                {
+                    resetModelButton.Visible = show;
+                    
+                    // Adjust overlay checkbox position based on download button visibility
+                    if (enableOverlayCheckBox != null)
+                    {
+                        enableOverlayCheckBox.Location = new Point(15, show ? 105 : 75);
+                    }
+                }
+            });
+        }
+    }
+    
+    // Method to handle model download button click
+    private async Task DownloadModelAsync()
+    {
+        try
+        {
+            if (resetModelButton != null)
+            {
+                // Disable button during download
+                resetModelButton.Enabled = false;
+                resetModelButton.Text = "Downloading...";
+                
+                UpdateStatusLabel("Downloading Whisper model, please wait...");
+                
+                // Release any existing resources
+                if (whisperRecognition != null)
+                {
+                    whisperRecognition.Dispose();
+                    whisperRecognition = null;
+                }
+                
+                // Create a directory for models if it doesn't exist
+                string modelsDir = Path.Combine(Application.StartupPath, "models");
+                Directory.CreateDirectory(modelsDir);
+                
+                // Set the model path
+                string modelPath = Path.Combine(modelsDir, "ggml-medium.bin");
+                
+                // Direct download from Hugging Face URL
+                string modelUrl = "https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-medium.bin?download=true";
+                
+                using (var client = new System.Net.WebClient())
+                {
+                    // Add download progress reporting
+                    client.DownloadProgressChanged += (s, e) =>
+                    {
+                        if (this.IsHandleCreated)
+                        {
+                            this.Invoke((MethodInvoker)delegate
+                            {
+                                UpdateStatusLabel($"Downloading Whisper model: {e.ProgressPercentage}% ({e.BytesReceived / 1024 / 1024} MB)");
+                                
+                                if (resetModelButton != null)
+                                {
+                                    resetModelButton.Text = $"Downloading {e.ProgressPercentage}%";
+                                }
+                            });
+                        }
+                    };
+                    
+                    // Download the file
+                    await client.DownloadFileTaskAsync(new Uri(modelUrl), modelPath);
+                }
+                
+                UpdateStatusLabel("Model downloaded. Initializing Whisper...");
+                
+                // Create new Whisper instance with the downloaded model
+                whisperRecognition = new WhisperSpeechRecognition("ggml-medium.bin");
+                whisperRecognition.StatusChanged += (sender, status) => 
+                {
+                    if (this.IsHandleCreated)
+                    {
+                        UpdateStatusLabel(status);
+                    }
+                };
+                
+                // Initialize the model
+                await whisperRecognition.InitializeAsync();
+                
+                // Update UI status
+                isWhisperReady = true;
+                UpdateStatusLabel("Whisper model downloaded and ready to use");
+                
+                // Hide download button
+                ShowDownloadButton(false);
+                
+                // Enable the whisper label
+                if (useWhisperLabel != null)
+                {
+                    useWhisperLabel.Enabled = true;
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            UpdateStatusLabel($"Error downloading model: {ex.Message}");
+            
+            // Re-enable the button for retry
+            if (resetModelButton != null)
+            {
+                resetModelButton.Enabled = true;
+                resetModelButton.Text = "Download Model";
+            }
         }
     }
 
@@ -1158,7 +1313,7 @@ public partial class Form1 : Form
         Panel leftPanel = new Panel
         {
             Width = 220,
-            Height = 350,
+            Height = 360,
             Location = new System.Drawing.Point(20, 20),
             BackColor = System.Drawing.Color.FromArgb(31, 34, 52), // Dark panel like Bitwarden
             BorderStyle = BorderStyle.None
@@ -1176,8 +1331,8 @@ public partial class Form1 : Form
         // Create right panel for status and display
         Panel rightPanel = new Panel
         {
-            Width = 360,
-            Height = 350,
+            Width = 370,
+            Height = 360,
             Location = new System.Drawing.Point(250, 20),
             BackColor = System.Drawing.Color.FromArgb(31, 34, 52), // Dark panel like Bitwarden
             BorderStyle = BorderStyle.None
@@ -1319,7 +1474,7 @@ public partial class Form1 : Form
         {
             Text = "Recognition Settings",
             Location = new System.Drawing.Point(15, 215), // Adjust position for new copy button
-            Size = new System.Drawing.Size(190, 125), // Increase height to accommodate overlay checkbox
+            Size = new System.Drawing.Size(190, 130), // Increase height to accommodate overlay checkbox
             Font = new System.Drawing.Font("Segoe UI", 9F, System.Drawing.FontStyle.Regular),
             ForeColor = System.Drawing.Color.White,
             BackColor = System.Drawing.Color.FromArgb(31, 34, 52) // Dark background like Bitwarden
@@ -1365,11 +1520,18 @@ public partial class Form1 : Form
         // Hidden reset model button (keeping the reference for code compatibility)
         resetModelButton = new Button
         {
-            Text = "Reset Model",
-            Size = new System.Drawing.Size(0, 0),
-            Visible = false,
-            Enabled = false
+            Text = "Download Model",
+            Size = new System.Drawing.Size(160, 30),
+            Location = new System.Drawing.Point(15, 70),
+            FlatStyle = FlatStyle.Flat,
+            BackColor = System.Drawing.Color.FromArgb(84, 130, 210), // Bitwarden accent blue
+            ForeColor = System.Drawing.Color.White,
+            Font = new System.Drawing.Font("Segoe UI", 9F, System.Drawing.FontStyle.Regular),
+            Cursor = Cursors.Hand,
+            Visible = false // Will be visible only when model is not available
         };
+        resetModelButton.FlatAppearance.BorderColor = System.Drawing.Color.FromArgb(84, 130, 210);
+        resetModelButton.Click += async (s, e) => await DownloadModelAsync();
         
         // Add components to settings group
         settingsGroupBox.Controls.Add(useWhisperLabel);
@@ -1395,7 +1557,7 @@ public partial class Form1 : Form
         // Status panel
         Panel statusPanel = new Panel
         {
-            Width = 340,
+            Width = 345,
             Height = 70,
             Location = new System.Drawing.Point(10, 10),
             BackColor = System.Drawing.Color.FromArgb(25, 27, 38), // Slightly lighter than main background
@@ -1471,8 +1633,8 @@ public partial class Form1 : Form
         {
             Text = "",
             AutoSize = false,
-            Width = 340,
-            Height = 220,
+            Width = 345,
+            Height = 230,
             Location = new System.Drawing.Point(10, 115),
             Font = new System.Drawing.Font("Segoe UI", 10F, System.Drawing.FontStyle.Regular),
             BorderStyle = BorderStyle.FixedSingle,
@@ -1521,7 +1683,7 @@ public partial class Form1 : Form
         {
             Width = 600,
             Height = 120,
-            Location = new System.Drawing.Point(20, 380),
+            Location = new System.Drawing.Point(20, 390),
             BackColor = System.Drawing.Color.FromArgb(31, 34, 52), // Dark panel like Bitwarden
             BorderStyle = BorderStyle.FixedSingle
         };
