@@ -394,7 +394,7 @@ public partial class Form1 : Form
     private System.Windows.Forms.Timer? flashTimer; // Timer for flashing the speaking indicator
     
     // Version information
-    public string appVersion = "1.0.2"; // Default version if config file not found
+    public string appVersion = "1.0.3"; // Default version if config file not found
     public string buildNumber = "1002";
     public string releaseDate = "2025-03-30";
     
@@ -2399,7 +2399,7 @@ public partial class Form1 : Form
             else
             {
                 // Default values if parent form not accessible
-                appVersion = "1.0.2";
+                appVersion = "1.0.3";
                 buildNumber = "1002";
             }
             
