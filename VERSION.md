@@ -1,6 +1,6 @@
 # AI Voice Keyboard - Version History
 
-## v1.0.3 (Current) - 2025-04-15
+## v1.0.3 (Current) - 2025-04-10
 
 ### Improved Recording State Management
 - Fixed issue with recording continuing to process after stopping
