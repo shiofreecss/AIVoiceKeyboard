@@ -135,7 +135,17 @@ namespace VoiceToKeyboard
                 _waveIn?.StopRecording();
                 
                 // Flush and close the wave writer
-                _waveWriter?.Flush();
+                if (_waveWriter != null)
+                {
+                    try
+                    {
+                        _waveWriter.Flush();
+                    }
+                    catch (Exception ex)
+                    {
+                        RaiseStatusChanged($"Error flushing audio: {ex.Message}");
+                    }
+                }
                 
                 if (_memoryStream != null && processAudio)
                 {
@@ -165,6 +175,10 @@ namespace VoiceToKeyboard
                         RaiseStatusChanged($"Error processing audio data: {ex.Message}");
                     }
                 }
+                else
+                {
+                    RaiseStatusChanged("Audio capture stopped without processing");
+                }
                 
                 _isRecording = false;
                 DisposeRecordingResources();
@@ -172,6 +186,8 @@ namespace VoiceToKeyboard
             catch (Exception ex)
             {
                 RaiseStatusChanged($"Error stopping recording: {ex.Message}");
+                _isRecording = false;
+                DisposeRecordingResources();
             }
             finally
             {

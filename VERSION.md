@@ -1,6 +1,20 @@
 # AI Voice Keyboard - Version History
 
-## v1.0.2 (Current) - 2025-03-30
+## v1.0.3 (Current) - 2025-04-15
+
+### Improved Recording State Management
+- Fixed issue with recording continuing to process after stopping
+- Added proper cancellation token handling throughout recording pipeline
+- Enhanced synchronization between main window and floating overlay button
+- Improved UI state consistency when toggling recording
+
+### Bug Fixes
+- Fixed inconsistent button state in overlay when enabling floating button during active recording
+- Added robust error handling in audio processing pipeline
+- Improved thread safety throughout the application
+- Enhanced UI refresh mechanisms to ensure visual state always matches actual state
+
+## v1.0.2 - 2025-03-30
 
 ### Version Configuration System
 - Added version.cfg file to manage application version information
@@ -55,3 +69,4 @@
 - Noise filtering
 - Floating overlay option
 - System tray integration
+

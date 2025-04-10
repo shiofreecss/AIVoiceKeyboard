@@ -4,6 +4,13 @@ A Windows application that converts voice to keyboard input using speech recogni
 
 ![AI Voice Keyboard](VoiceToKeyboard/icon/ai-voice-keyboard.png)
 
+## Latest Update (v1.0.3)
+
+- Fixed issues with recording state management
+- Improved floating button synchronization
+- Enhanced error handling and thread safety
+- [See full release notes](VERSION.md)
+
 ## Features
 
 - **Two Recognition Modes:**

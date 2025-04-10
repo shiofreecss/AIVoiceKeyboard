@@ -238,34 +238,50 @@ public class OverlayForm : Form
         {
             this.BeginInvoke((MethodInvoker)delegate
             {
-                // Update recording button
-                if (isRecording)
+                try
                 {
-                    recordButton.BackColor = Color.Red;
-                    recordButton.Text = "■";
+                    // Update recording button with distinctive UI change
+                    if (isRecording)
+                    {
+                        recordButton.BackColor = Color.Red;
+                        recordButton.Text = "■";
+                        
+                        // Force a refresh to ensure UI update is visible
+                        recordButton.Refresh();
+                        
+                        if (notifyIcon != null)
+                            notifyIcon.Text = $"AI Voice Keyboard ({currentMode} Mode - Recording)";
+                    }
+                    else
+                    {
+                        recordButton.BackColor = Color.Gray;
+                        recordButton.Text = "●";
+                        
+                        // Force a refresh to ensure UI update is visible
+                        recordButton.Refresh();
+                        
+                        if (notifyIcon != null)
+                            notifyIcon.Text = $"AI Voice Keyboard ({currentMode} Mode - Not Recording)";
+                    }
                     
-                    if (notifyIcon != null)
-                        notifyIcon.Text = $"AI Voice Keyboard ({currentMode} Mode - Recording)";
-                }
-                else
-                {
-                    recordButton.BackColor = Color.Gray;
-                    recordButton.Text = "●";
+                    // Update mode indicator
+                    if (currentMode == Form1.InputMode.Command)
+                    {
+                        modeIndicator.Text = "CMD";
+                        modeIndicator.BackColor = Color.FromArgb(41, 44, 62);
+                    }
+                    else
+                    {
+                        modeIndicator.Text = "STR";
+                        modeIndicator.BackColor = Color.FromArgb(84, 130, 210); // Bitwarden blue
+                    }
                     
-                    if (notifyIcon != null)
-                        notifyIcon.Text = $"AI Voice Keyboard ({currentMode} Mode - Not Recording)";
+                    // Force UI refresh to ensure changes are visible
+                    this.Refresh();
                 }
-                
-                // Update mode indicator
-                if (currentMode == Form1.InputMode.Command)
+                catch (Exception ex)
                 {
-                    modeIndicator.Text = "CMD";
-                    modeIndicator.BackColor = Color.FromArgb(41, 44, 62);
-                }
-                else
-                {
-                    modeIndicator.Text = "STR";
-                    modeIndicator.BackColor = Color.FromArgb(84, 130, 210); // Bitwarden blue
+                    Console.WriteLine($"Error updating overlay button state: {ex.Message}");
                 }
             });
         }
@@ -850,6 +866,13 @@ public partial class Form1 : Form
         if (whisperRecognition == null || !isWhisperReady)
             return;
             
+        // Check if cancellation was requested before starting processing
+        if (cancellationTokenSource != null && cancellationTokenSource.Token.IsCancellationRequested)
+        {
+            UpdateStatusLabel("Processing canceled");
+            return;
+        }
+            
         // Prevent duplicate processing
         if (isProcessingAudio)
         {
@@ -873,21 +896,52 @@ public partial class Form1 : Form
                 return;
             }
             
+            // Check cancellation again before heavy processing
+            if (cancellationTokenSource != null && cancellationTokenSource.Token.IsCancellationRequested)
+            {
+                UpdateStatusLabel("Processing canceled");
+                isProcessingAudio = false;
+                return;
+            }
+            
             // Calculate an appropriate timeout based on audio length
             // Roughly 1 second processing time per 2 seconds of audio, with minimum 2 seconds
             int audioLengthMs = audioData.Length / (SampleRate * BitsPerSample * Channels / 8 / 1000);
             int timeoutMs = Math.Max(2000, audioLengthMs / 2);
             
+            // Create a linked cancellation token that also cancels if the main token is canceled
+            CancellationTokenSource linkedTokenSource = CancellationTokenSource.CreateLinkedTokenSource(
+                cancellationTokenSource?.Token ?? CancellationToken.None
+            );
+            linkedTokenSource.CancelAfter(timeoutMs);
+            
             // Set timeout for speech processing to maintain responsiveness
             var recognitionTask = whisperRecognition.ProcessAudioAsync(audioData);
-            string recognizedText = await await Task.WhenAny(
-                recognitionTask, 
-                Task.Delay(timeoutMs).ContinueWith(_ => string.Empty) // Dynamic timeout
+            
+            // Use Task.WhenAny with the linked token
+            var completedTask = await Task.WhenAny(
+                recognitionTask,
+                Task.Delay(timeoutMs, linkedTokenSource.Token)
             );
             
-            // If timeout occurred, handle gracefully
-            if (string.IsNullOrEmpty(recognizedText) && !recognitionTask.IsCompleted)
+            // Check if we were canceled
+            if (cancellationTokenSource != null && cancellationTokenSource.Token.IsCancellationRequested)
             {
+                UpdateStatusLabel("Processing canceled");
+                isProcessingAudio = false;
+                return;
+            }
+            
+            string recognizedText = string.Empty;
+            
+            // Only get the result if the recognition task completed
+            if (completedTask == recognitionTask && recognitionTask.IsCompleted)
+            {
+                recognizedText = await recognitionTask;
+            }
+            else
+            {
+                // Timeout or cancellation occurred
                 UpdateStatusLabel("Speech recognition timed out, continuing...");
                 isProcessingAudio = false;
                 return;
@@ -905,6 +959,11 @@ public partial class Form1 : Form
                 // No text was recognized, prepare for next capture
                 UpdateStatusLabel("No speech detected, ready for next capture");
             }
+        }
+        catch (TaskCanceledException)
+        {
+            // This is expected when cancellation occurs
+            UpdateStatusLabel("Processing was canceled");
         }
         catch (Exception ex)
         {
@@ -2155,7 +2214,15 @@ public partial class Form1 : Form
             {
                 // Stop Whisper-based recognition
                 cancellationTokenSource?.Cancel();
-                audioCapture.StopRecordingAsync().Wait();
+                
+                // Wait for audio capture to stop
+                audioCapture.StopRecordingAsync(false).Wait(); // Pass false to avoid processing captured audio
+                
+                // Reset processing flag to ensure we don't continue processing
+                isProcessingAudio = false;
+                
+                // Update UI to indicate processing has stopped
+                UpdateStatusLabel("Recording stopped");
             }
             else if (dictationRecognizer != null)
             {
@@ -2275,7 +2342,14 @@ public partial class Form1 : Form
             {
                 if (overlayForm != null && !overlayForm.IsDisposed && overlayEnabled)
                 {
-                    overlayForm.UpdateButtonState(isRecording, currentMode);
+                    // Store the current listening state to match overlay button state
+                    // This is critical to keep the UI consistent
+                    isListening = isRecording;
+                    
+                    // Update the overlay
+                    overlayForm.BeginInvoke(new Action(() => {
+                        overlayForm.UpdateButtonState(isRecording, currentMode);
+                    }));
                 }
             }
             catch (Exception ex)
@@ -2654,6 +2728,8 @@ public partial class Form1 : Form
             
             // Create a new overlay form
             overlayForm = new OverlayForm(this);
+            
+            // Ensure the recording state is properly synchronized before showing
             overlayForm.UpdateButtonState(isListening, currentMode);
             
             // Show the form without setting this as owner to prevent minimizing with main window
@@ -2662,6 +2738,9 @@ public partial class Form1 : Form
             // Ensure it's on top
             overlayForm.TopMost = true;
             overlayForm.BringToFront();
+            
+            // Force a redraw of the button state to ensure proper appearance
+            overlayForm.UpdateButtonState(isListening, currentMode);
         }
         catch (Exception ex)
         {
@@ -2723,11 +2802,38 @@ public partial class Form1 : Form
             if (toggleButton != null && this.IsHandleCreated && !this.IsDisposed)
             {
                 // Use BeginInvoke to safely invoke from another thread if needed
-                this.BeginInvoke(new Action(() => ToggleRecognition(toggleButton)));
+                this.BeginInvoke(new Action(() => {
+                    // Store previous state to detect change
+                    bool wasListening = isListening;
+                    
+                    // Toggle recording state
+                    ToggleRecognition(toggleButton);
+                    
+                    // If state changed and we have an overlay, force update it
+                    if (wasListening != isListening && overlayForm != null && !overlayForm.IsDisposed)
+                    {
+                        // Apply a small delay to ensure UI state is settled
+                        Task.Delay(100).ContinueWith(_ => {
+                            try {
+                                if (this.IsHandleCreated && !this.IsDisposed)
+                                {
+                                    this.BeginInvoke(new Action(() => {
+                                        overlayForm.UpdateButtonState(isListening, currentMode);
+                                    }));
+                                }
+                            }
+                            catch (Exception) {
+                                // Ignore errors if form was closed
+                            }
+                        });
+                    }
+                }));
             }
             else
             {
                 // Fallback to direct toggling if button not found
+                bool wasListening = isListening;
+                
                 if (isListening)
                 {
                     StopListening();
@@ -2737,13 +2843,27 @@ public partial class Form1 : Form
                 else
                 {
                     StartListening();
+                    isListening = true;
                     UpdateStatusLabel($"Listening in {currentMode} mode...");
                 }
                 
-                // Update overlay button appearance manually
-                if (overlayForm != null && !overlayForm.IsDisposed)
+                // Force update overlay button appearance
+                if (wasListening != isListening && overlayForm != null && !overlayForm.IsDisposed)
                 {
-                    overlayForm.UpdateButtonState(isListening, currentMode);
+                    // Schedule update with slight delay to ensure state is properly set
+                    Task.Delay(100).ContinueWith(_ => {
+                        try {
+                            if (this.IsHandleCreated && !this.IsDisposed)
+                            {
+                                this.BeginInvoke(new Action(() => {
+                                    overlayForm.UpdateButtonState(isListening, currentMode);
+                                }));
+                            }
+                        }
+                        catch (Exception) {
+                            // Ignore errors if form was closed
+                        }
+                    });
                 }
             }
         }
